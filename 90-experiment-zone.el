@@ -28,8 +28,9 @@
              (file-lnum-alist (--map (string-split it ":" t)
                                      (string-split rg-result "\n" t)))
              (by-file (-group-by #'car file-lnum-alist))
-             (n-files (length by-file))
-             (ctr 0))
+             ;; (n-files (length by-file))
+             ;; (ctr 0)
+             )
         (dolist (data by-file)
           (org-roam-with-file (expand-file-name (car data) org-roam-directory) nil
             ;; (message "Visiting... (%d/%d) %s" (cl-incf ctr) n-files (car data))
@@ -46,6 +47,8 @@
                               :src-id (org-id-get))
                         backlinks)))))))
     (message "%s" backlinks)))
+
+
 
 
 ;;; Crap
