@@ -13,6 +13,9 @@
 (use-package quickroam
   :hook (org-mode . quickroam-enable))
 
+;; (use-package org-node
+;;   :hook (org-mode . org-node-enable-cache))
+
 (setopt helpful-max-buffers nil) ;; what's the point of killing buffers
 (setopt iflipb-wrap-around t)
 (setopt ranger-map-style 'emacs)

@@ -18,6 +18,7 @@
        (not (null buffer-undo-list))))
 
 (defmacro while-progn (&rest body)
+  "Lets you indent less than a (while (progn)) form."
   `(while (progn ,@body)))
 
 ;; So you can type (hookgen org-mode-hook (set-face-attribute ...) ...).
