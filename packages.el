@@ -16,12 +16,8 @@
 (package! quickroam :type 'local :recipe (:host github :repo "meedstrom/quickroam" :depth full))
 ;; (package! lintorg :type 'local :recipe (:host github :repo "meedstrom/lintorg" :depth full))
 (package! inline-anki :type 'local :recipe (:host github :repo "meedstrom/inline-anki" :depth full))
-(package! eva
-  :type 'local
-  :recipe (:host github
-           :repo "meedstrom/eva"
-           :depth full
-           :files (:defaults "assets" "renv" "*.R" "*.gnuplot")))
+(package! id-pile :type 'local :recipe (:host github :repo "meedstrom/id-pile" :depth full))
+(package! eva :type 'local :recipe (:host github :repo "meedstrom/eva" :depth full :files (:defaults "assets" "renv" "*.R" "*.gnuplot")))
 
 ;; Disable Doom-installed stuff
 (package! org-crypt :disable t) ;; slowwww

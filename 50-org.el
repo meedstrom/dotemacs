@@ -9,7 +9,7 @@
 (setopt org-archive-location "/home/kept/roam/noagenda/archive.org::datetree/")
 (setopt org-clock-persist t)
 (setopt org-clock-auto-clock-resolution t)
-(setopt org-startup-folded 'nofold)
+;; (setopt org-startup-folded 'nofold)
 (setopt org-agenda-include-diary t)
 (setopt citar-bibliography '("/home/kept/roam/refs/library_biblatex.bib"))
 (setopt org-agenda-todo-list-sublevels nil)

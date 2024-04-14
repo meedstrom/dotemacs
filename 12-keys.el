@@ -51,11 +51,11 @@
 (keymap-set global-map "<f2> e s" #'ess-eval-region-or-function-or-paragraph-and-step) ;; ess everywhere
 (keymap-set global-map "<f2> e x" #'eval-expression)
 ;; (keymap-set global-map "<f2> f" #'org-roam-node-find)
-(keymap-set global-map "<f2> f" #'org-node-find)
+(keymap-set global-map "<f2> f" #'id-pile-find)
 (keymap-set global-map "<f2> g" #'git-timemachine)
 (keymap-set global-map "<f2> h" #'consult-find)
 ;; (keymap-set global-map "<f2> i" #'org-roam-node-insert)
-(keymap-set global-map "<f2> i" #'org-node-insert-link)
+(keymap-set global-map "<f2> i" #'id-pile-insert-link)
 (keymap-set global-map "<f2> j" #'+default/find-file-under-here)
 (keymap-set global-map "<f2> k" #'+default/search-project)
 (keymap-set global-map "<f2> l" #'helm-locate)
@@ -192,6 +192,11 @@
 (after! doom-keybinds
   (keymap-set doom-leader-map "f d" (keymap-lookup doom-leader-map "f D")))
 
+;; Org localleader (on a hook to override)
+(my-hook-once 'org-load-hook
+  (map! :map org-mode-map :localleader "i" #'my-org-id-get-create-and-copy)
+  (map! :map org-mode-map :localleader "h" #'my-insert-heading-with-id))
+
 (after! mu4e
   ;; Uppercase key bindings for common actions, really?  Die.
   ;; .. thinking that I should automate this, prior art in massmapper.el
@@ -266,10 +271,6 @@
 (after! timer-list
   (keymap-set timer-list-mode-map "a" #'my-timer-list-autorefresh))
 
-;; Org localleader (on a hook to override "i")
-(my-hook-once 'org-load-hook
-  (map! :map org-mode-map :localleader "i" #'my-org-id-get-create-and-copy)
-  (map! :map org-mode-map :localleader "h" #'my-insert-heading-with-id))
 
 (after! dired
   ;; Dired's default unbound keys: `, b, E, J, K, r, z, <backspace>

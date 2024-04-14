@@ -1,123 +1,42 @@
 ;; Experiment zone -*- lexical-binding: t; -*-
 
-;; Yep it's slow.  I see why org-roam-db-sync is slow - it's actually kind of
-;; fast for what it does.
-(defun quickroam-resolve-backlinks ()
-  "Using ripgrep, find all backlinks to current file."
-  (interactive)
-  (unless (org-roam-file-p)
-    (error "Not an org-roam file %s" (buffer-name)))
-  (let ((heading-ids-in-file nil)
-        (backlinks nil)
-        (default-directory org-roam-directory))
-    (save-excursion
-      (goto-char (point-min))
-      (while (not (eobp))
-        (when (org-roam-db-node-p)
-          (push (org-id-get) heading-ids-in-file))
-        (outline-next-heading)))
-    (dolist (id heading-ids-in-file)
-      (let* ((rg-result (apply #'quickroam--program-output "rg"
-                               `("--line-number"
-                                 "--no-heading"
-                                 "--with-filename"
-                                 "--only-matching"
-                                 "--replace" ""
-                                 ,@quickroam-extra-rg-args
-                                 ,(concat "\\[\\[id:" id "\\]"))))
-             (file-lnum-alist (--map (string-split it ":" t)
-                                     (string-split rg-result "\n" t)))
-             (by-file (-group-by #'car file-lnum-alist))
-             ;; (n-files (length by-file))
-             ;; (ctr 0)
-             )
-        (dolist (data by-file)
-          (org-roam-with-file (expand-file-name (car data) org-roam-directory) nil
-            ;; (message "Visiting... (%d/%d) %s" (cl-incf ctr) n-files (car data))
-            (cl-loop
-             for lnum in (cdadr data)
-             do (progn
-                  (goto-line (string-to-number lnum))
-                  (org-back-to-heading-or-point-min)
-                  (cl-loop until (or (bobp) (org-roam-db-node-p))
-                           do (org-roam-up-heading-or-point-min))
-                  (push (list :src-title (if (org-before-first-heading-p)
-                                             (org-get-title)
-                                           (nth 4 (org-heading-components)))
-                              :src-id (org-id-get))
-                        backlinks)))))))
-    (message "%s" backlinks)))
 
-
-
-
-;;; Crap
-
-(defvar qic (make-hash-table :test #'equal))
-(defun qic-make ()
-  (interactive)
-  (clrhash qic)
-  (cl-loop for node being the hash-values of quickroam-cache
-           do (progn ;; (plist-put node :backlinks nil)
-                (puthash (plist-get node :id) node qic))))
-
-(defun qic-peek ()
-  (interactive)
-  (let ((rows (hash-table-values qic)))
-    (dotimes (_ 4)
-      (print (nth (random (length rows)) rows)))))
-
-;; Should probably use org-ql, not ripgrep directly.
+;; Reinvent the wheel.  Not so happy with `lwarn'...  A wrapper that hardcodes
+;; arguments TYPE and LEVEL will indent more compactly like vanilla `error'.
+;; Further, the level :error is not a real error and allows program flow to
+;; continue!  And also not so happy with `error' as an user-facing warning,
+;; because it's super easy to miss when `debug-on-error' is not t.
 ;;
-;; Anyway, this proof of concept shows that a naive ripgrep approach would
-;; limit me to just storing the line-number where a link was found.  Can't
-;; detect the local subtree.
-(defun quickroam-seek-backlinks ()
-  (interactive)
-  (let* ((default-directory org-roam-directory)
-         (results (apply #'quickroam--program-output "rg"
-                         `("--line-number"
-                           "--only-matching"
-                           "--replace" "$1"
-                           ,@quickroam-extra-rg-args
-                           "\\[\\[id:(.+?)\\]"))))
-    (dolist (line (string-split results "\n" t))
-      (let* ((splits (string-split line ":"))
-             (file (pop splits))
-             (lnum (pop splits))
-             (id (string-join splits)))
-        (if (gethash id qic)
-            (push (list :src-file file
-                        :src-lnum (string-to-number lnum)
-                        :src-title nil
-                        :src-id nil)
-                  (plist-get (gethash id qic) :backlinks))
-          (message "not found %s" id))))))
+;; If I have to write so much code every time to emit an error, I may not
+;; bother to write them in the first place.  It needs to be easy.
 
-(defun quickroam-resolve-backlinks* ()
-  (interactive)
-  (let ((all-backlinks (--mapcat (plist-get it :backlinks)
-                                 (hash-table-values qic))))
-    (dolist (node (hash-table-values qic))
-      (cl-loop
-       for (file . backlinks) in (--group-by (plist-get it :src-file)
-                                             all-backlinks)
-       do (org-roam-with-file (expand-file-name file org-roam-directory) nil
-            (message "Visiting... %s" file)
-            (cl-loop
-             for backlink in backlinks
-             do (progn
-                  (cl-letf ((push-mark #'ignore)
-                            (set-mark #'ignore))
-                    (goto-line (plist-get backlink :src-lnum))
-                    (org-back-to-heading-or-point-min)
-                    (cl-loop until (or (org-roam-db-node-p) (bobp))
-                             do (org-roam-up-heading-or-point-min)))
-                  (plist-put backlink :src-title
-                             (if (org-before-first-heading-p)
-                                 (org-get-title)
-                               (nth 4 (org-heading-components))))
-                  (plist-put backlink :src-id (org-id-get)))))))))
+(defun die (&rest args)
+  "Like `error' but allow specifying keywords :level and :type anywhere in ARGS,
+and display the error clearly using `display-warning'.
+
+Unlike `lwarn', LEVEL is a proper non-keyword symbol, i.e. do not
+write :level :warning, but :level 'warning."
+  ;; (declare (indent defun))
+  (let (level type true-args err-string keyword)
+    (cl-labels
+        ((eat (args)
+           (if (not (keywordp (car args)))
+               (push (pop args) true-args)
+             (setq keyword (pop args))
+             (cond
+              ((eq ':level keyword)
+               (setq level
+                     (intern
+                      (concat ":" (symbol-name (pop args))))))
+              ((eq ':type keyword)
+               (setq type (pop args)))))
+           (unless (null args)
+             (eat args))))
+      (eat args)
+      (setq args (reverse true-args))
+      (setq err-string (format (car args) (cdr args))))
+    (display-warning type err-string (or level :error))
+    (error "%s" err-string)))
 
 
 ;;

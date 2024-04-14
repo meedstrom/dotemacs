@@ -10,11 +10,17 @@
   :hook ((text-mode elfeed-show-mode eww-mode shr-mode) . iscroll-mode))
 (use-package! nov
   :mode ("\\.epub\\'" . nov-mode))
-(use-package quickroam
-  :hook (org-mode . quickroam-enable))
+(use-package id-pile
+  :hook (org-mode . id-pile-enable))
 
-;; (use-package org-node
-;;   :hook (org-mode . org-node-enable-cache))
+;; slow, better tell org id locations about the dirs so it writes to disk
+(add-hook 'id-pile-mode-hook #'org-roam-update-org-id-locations)
+
+;; (setq id-pile-filter-fn
+;;       (defun my-filter (node)
+;;         (declare (pure t) (side-effect-free t))
+;;         (and (not (plist-get node :todo))
+;;              (not (plist-get node :roam-exclude)))))
 
 (setopt helpful-max-buffers nil) ;; what's the point of killing buffers
 (setopt iflipb-wrap-around t)
