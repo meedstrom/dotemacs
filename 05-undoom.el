@@ -39,6 +39,10 @@
 (fset 'doom-docs-org-mode #'ignore)
 (fset 'doom-docs--toggle-read-only-h #'ignore)
 
+;; i lost work !!!
+(after! doom-keybinds
+  (keymap-set doom-leader-map "q q" #'save-buffers-kill-emacs))
+
 (after! eshell
   (setopt eshell-input-filter #'eshell-input-filter-default)
   (setopt eshell-scroll-to-bottom-on-input nil)
