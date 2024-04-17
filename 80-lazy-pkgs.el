@@ -16,11 +16,11 @@
 ;; slow, better tell org id locations about the dirs so it writes to disk
 (add-hook 'org-node-cache-mode-hook #'org-roam-update-org-id-locations)
 
-;; (setq id-pile-filter-fn
-;;       (defun my-filter (node)
-;;         (declare (pure t) (side-effect-free t))
-;;         (and (not (plist-get node :todo))
-;;              (not (plist-get node :roam-exclude)))))
+(setq id-pile-filter-fn
+      (defun my-filter (node)
+        (declare (pure t) (side-effect-free t))
+        (and (not (plist-get node :todo))
+             (not (plist-get node :roam-exclude)))))
 
 (setopt helpful-max-buffers nil) ;; what's the point of killing buffers
 (setopt iflipb-wrap-around t)

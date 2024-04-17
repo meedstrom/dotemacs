@@ -21,9 +21,7 @@
   ;; Org-roam completion source ends up shown below the massive recentf source
   ;; (consult-org-roam-mode)
   
-  (org-roam-db-autosync-mode)
-
-
+  (org-roam-db-autosync-mode 0)
   ;; Because `org-roam-db-autosync-mode' is very slow saving large files,
   ;; set up only the other relevant things that it would have set up.
   ;; (add-hook 'org-mode-hook

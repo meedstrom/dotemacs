@@ -9,7 +9,7 @@
        :config (default +bindings +smartparens)
 
        :ui
-       (vc-gutter +diff-hl +pretty)
+       (vc-gutter)
        hl-todo
        ligatures
 

@@ -12,6 +12,11 @@
   (interactive)
   )
 
+;; (add-hook 'after-save-hook #'my-eval-buffer-if-elisp)
+(defun my-eval-buffer-if-elisp ()
+  (and (derived-mode-p 'emacs-lisp-mode)
+       (eval-buffer)))
+
 (defun my-rename-and-relink-asset-at-point ()
   (interactive)
   (let ((thing (if (derived-mode-p 'dired-mode)
@@ -72,46 +77,6 @@ this function will insert before it."
       (newline)
       (apply #'insert strings))))
 
-(defun my-transclude-node-as-subtree-here ()
-  "Insert a link and a transclusion.
-
-Result will basically look like:
-
-** [[Note]]
-#+transclude: [[Note]] :level 3
-
-but adapt to the surrounding outline level."
-  (interactive)
-  (let ((level (or (org-current-level) 0))
-        (node (org-roam-node-read)))
-    (insert (org-link-make-string (concat "id:" (org-roam-node-id node))
-                                  (org-roam-node-formatted node)))
-    (duplicate-line)
-    (beginning-of-line-text)
-    ;; (goto-char (line-beginning-position))
-    (insert (make-string (+ 1 level) (string-to-char "*")) " ")
-    (forward-line 1)
-    ;; (goto-char (line-beginning-position))
-    (beginning-of-line-text)
-    (insert "#+transclude: ")
-    (goto-char (line-end-position))
-    (insert " :level " (format "%d" (+ 2 level)))
-    ;; If the target is a subtree rather than file-level node, then cut out the
-    ;; initial heading because we already made a heading.
-    ;; NOTE it currently prevents `org-transclusion-exclude-elements' from
-    ;; having an effect.
-    (unless (= 0 (org-roam-node-level node))
-      ;; TODO: I usually have 4-5 lines in my property drawers, and where it's
-      ;; off, I can change the value on a case-by-case basis, but it won't be
-      ;; futureproof.  Patch `org-transclusion-content-range-of-lines' to
-      ;; respect `org-transclusion-exclude-elements'!
-      (insert " :lines 5-"))))
-
-;; (defun org-roam-with-file (file keep-buf-p &rest body)
-;;   (declare (indent 2))
-;;   (apply #'org-roam-with-file* file keep-buf-p t body))
-;; (make-obsolete #'org-roam-with-file #'org-roam-with-file* "2024-03-23")
-
 ;; see the line marked OVERRIDE, which is the only difference. i suspect the
 ;; upstream design is a bug, but if it is really intended to have `unless',
 ;; then propose adding this variant and the above compat wrapper
@@ -146,66 +111,6 @@ Kills the buffer if KEEP-BUF-P is nil, and FILE is not yet visited."
          (when (find-buffer-visiting ,file)
            (kill-buffer (find-buffer-visiting ,file))))
      res))
-
-(defun my-org-roam-rewrite-links-ask ()
-  (interactive)
-  (require 'org-roam)
-  (require 'ol)
-  (let ((autosave? (when auto-save-visited-mode
-                     (auto-save-visited-mode 0)
-                     t))
-        ;; (org-inhibit-startup t)
-        ;; (org-agenda-files nil)
-        ;; (find-file-hook nil)
-        ;; (auto-mode-alist nil)
-        )
-    (unwind-protect
-        (cl-loop
-         for file in (org-roam-list-files)
-         unless (string-search "daily/" file)
-         do
-         ;; (progn
-         ;; (find-file file)
-         (org-roam-with-file* file t t
-           (goto-char (point-min))
-           (while-let ((end (re-search-forward org-link-bracket-re nil t)))
-             (let* ((beg (match-beginning 0))
-                    (link (match-string 0))
-                    (parts (split-string link "]\\["))
-                    (target (substring (car parts) 2))
-                    (desc (when (cadr parts)
-                            (substring (cadr parts) 0 -2)))
-                    (id (when (string-prefix-p "id:" target)
-                          (substring target 3)))
-                    (node (when id
-                            (org-roam-node-from-id id)))
-                    (true-title (when node
-                                  (org-roam-node-title node))))
-               (when (and node
-                          (not (or (string-equal-ignore-case desc true-title)
-                                   (member-ignore-case
-                                    desc (org-roam-node-aliases node)))))
-                 (switch-to-buffer (current-buffer))
-                 ;; (delay-mode-hooks
-                 ;; (org-mode)
-                 ;; (hack-local-variables))
-                 ;; (redisplay)
-                 (highlight-regexp (rx (literal link)))
-                 (when (yes-or-no-p (format "Rewrite link to this?  %s"
-                                            true-title))
-                   (unhighlight-regexp (rx (literal link)))
-                   (goto-char beg)
-                   (delete-region beg end)
-                   (insert (org-link-make-string target true-title))
-                   ;; Give user a chance to glimpse the result before moving
-                   ;; on
-                   (redisplay)
-                   (sleep-for .1)))))))
-      (when autosave?
-        (message "So you know, auto-save-visited-mode is still disabled!"))))
-  (save-some-buffers)
-  (when autosave?
-    (message "So you know, auto-save-visited-mode is still disabled!")))
 
 ;; used once
 (defun my-add-lw-ref-slugs ()
