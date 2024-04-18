@@ -14,13 +14,23 @@
   :hook (org-mode . org-node-enable))
 
 ;; slow, better tell org id locations about the dirs so it writes to disk
-(add-hook 'org-node-cache-mode-hook #'org-roam-update-org-id-locations)
+;; (add-hook 'org-node-cache-mode-hook #'org-roam-update-org-id-locations)
 
-(setq id-pile-filter-fn
+(setq debug-on-error t)
+;; (setq org-node-format-candidate-fn
+;;       (lambda (node title)
+;;         (concat (file-name-nondirectory (plist-get node :file-path))
+;;                 " -> "
+;;                 title)))
+
+(setq org-node-filter-fn
       (defun my-filter (node)
         (declare (pure t) (side-effect-free t))
         (and (not (plist-get node :todo))
              (not (plist-get node :roam-exclude)))))
+
+(after! org-roam-mode
+  (advice-add 'org-roam-backlinks-get :override #'org-node--fabricate-roam-backlinks))
 
 (setopt helpful-max-buffers nil) ;; what's the point of killing buffers
 (setopt iflipb-wrap-around t)
@@ -30,14 +40,6 @@
 (setopt calibredb-root-dir "~/Calibre Library/")
 (setopt calibredb-db-dir (expand-file-name "metadata.db" calibredb-root-dir))
 (setopt calibredb-format-width 8)
-
-;; (after! quickroam
-;;   (setopt quickroam-extra-rg-args
-;;           '("--glob" "**/*.org"
-;;             "--glob" "!logseq/**"
-;;             "--glob" "!*.sync-conflict-*"
-;;             "--glob" "!noagenda/**"
-;;             "--glob" "!*archive*")))
 
 (after! multiple-cursors
   ;; auto-save every 5 seconds destroys what youre doing!

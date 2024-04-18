@@ -13,6 +13,13 @@
 ;;   (defalias #'setopt #'general-setq)
 ;;   (defalias #'duplicate-dwim #'crux-duplicate-current-line-or-region))
 
+;; upstream?
+(defun tee (pre input)
+  "Convenient debugging!"
+  (message "%s %s" pre input)
+  input)
+
+;; upstream?
 (defun buffer-has-undo-history-p ()
   (and (not (eq t buffer-undo-list))
        (not (null buffer-undo-list))))
@@ -34,6 +41,7 @@
 (defalias 'anon-hook #'hookgen)
 (defalias 'captain-hook #'hookgen)
 
+;; upstream soemthing like this?
 (defmacro time (&rest body)
   "Evaluate BODY and print time elapsed."
   (let ((T (cl-gensym)))

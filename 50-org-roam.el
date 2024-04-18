@@ -1,57 +1,35 @@
 ;; -*- lexical-binding: t; -*-
 
-;;; PERFORMANCE (Org-roam has some tarpits)
+;; (add-hook 'org-mode-hook
+;;           (defun my-roam-setup ()
+;;             (require 'org-roam)
+;;             (when (org-roam-file-p)
+;;               (add-hook 'post-command-hook #'org-roam-buffer--redisplay-h 0 t)
+;;               )))
 
-;; Don't seek "roam:" links (slows saving)
 (setopt org-roam-link-auto-replace nil)
 (setopt org-roam-db-update-on-save nil)
-
-;; I didn't realize for the longest time, but Logseq's logseq/ subdirectory has
-;; a lot of backups ending in ".org", adding to the sync time.
-(after! org-roam
-  (add-to-list 'org-roam-file-exclude-regexp "logseq/")
-  (add-to-list 'org-roam-file-exclude-regexp "archive.org"))
-
-;; Speed up `org-roam-db-sync'
-;; NOTE: Counterproductive on Windows
-;; NOTE: `setopt' breaks it, use `setq'
 (setq org-roam-db-gc-threshold (* 4 1024 1024 1024)) ;; 4 GiB
-
-(after! org-roam
-  ;; Org-roam completion source ends up shown below the massive recentf source
-  ;; (consult-org-roam-mode)
-  
-  (org-roam-db-autosync-mode 0)
-  ;; Because `org-roam-db-autosync-mode' is very slow saving large files,
-  ;; set up only the other relevant things that it would have set up.
-  ;; (add-hook 'org-mode-hook
-  ;;           (defun my-roam-setup ()
-  ;;             (when (org-roam-file-p)
-  ;;               (org-roam--register-completion-functions-h)
-  ;;               (add-hook 'post-command-hook #'org-roam-buffer--redisplay-h 0 t)
-  ;;               ;; (add-hook 'after-save-hook #'my-roam-memo-schedule 0 t)
-  ;;               )))
-  )
-
-
+(setq org-element-cache-persistent nil)
 
 ;;; Stuff
 
-(define-key global-map [remap org-open-at-point] #'my-org-open-at-point-as-maybe-roam-ref)
+;; (define-key global-map [remap org-open-at-point] #'my-org-open-at-point-as-maybe-roam-ref)
 (add-hook 'org-roam-capture-new-node-hook #'my-org-add-:CREATED:)
 (add-hook 'org-roam-buffer-postrender-functions #'magit-section-show-level-2)
-(setopt org-roam-directory "/home/kept/roam/")
-(setopt org-roam-extract-new-file-path "${slug}.org")
-(setopt org-roam-ui-browser-function #'my-browse-url-chromium-kiosk)
+(after! org-roam
+  (setopt org-roam-directory "/home/kept/roam/")
+  (setopt org-roam-extract-new-file-path "${slug}.org")
+  (setopt org-roam-ui-browser-function #'my-browse-url-chromium-kiosk))
 
 (when os-guix
   (add-to-list 'browse-url-chromium-arguments "--no-sandbox"))
 
-;; Use my own slug style (see `my-slugify')
-(after! org-roam-node
-  (cl-defmethod org-roam-node-slug ((node org-roam-node))
-    "Return the slug of NODE."
-    (my-slugify (org-roam-node-title node))))
+;; ;; Use my own slug style (see `my-slugify')
+;; (after! org-roam-node
+;;   (cl-defmethod org-roam-node-slug ((node org-roam-node))
+;;     "Return the slug of NODE."
+;;     (my-slugify (org-roam-node-title node))))
 
 (after! org-roam
   (add-hook 'doom-load-theme-hook
