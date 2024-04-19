@@ -23,6 +23,11 @@
 ;;                 " -> "
 ;;                 title)))
 
+(setq org-node-slug-fn #'org-node--slugify)
+(setq org-node-create-and-visit-fn #'org-node--basic-create-and-visit)
+(setq org-node-create-and-insert-fn #'org-node--basic-create-and-insert)
+(setq org-node-butler-upcase-properties nil)
+(setq org-node-butler-upcase-keywords t)
 (setq org-node-filter-fn
       (defun my-filter (node)
         (declare (pure t) (side-effect-free t))
@@ -52,12 +57,10 @@
                                   "noexport"
                                   "ARCHIVE"
                                   "stub"
-                                  "eyes_partner"
-                                  "eyes_friend"
-                                  "eyes_therapist"))
+                                  "fren"
+                                  "privy"))
   (add-to-list 'inline-anki-fields '("Online mirror" . my-anki-field-for-webpage))
   (add-to-list 'inline-anki-ignore-file-regexps "/daily/")
-  (add-to-list 'inline-anki-ignore-file-regexps "/lesswrong/")
   (after! org
     (add-to-list 'org-structure-template-alist '("f" . "flashcard"))))
 

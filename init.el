@@ -14,6 +14,7 @@
        ligatures
 
        :lang
+       (rust +tree-sitter +lsp)
        emacs-lisp
        data
        (ess +tree-sitter +stan +lsp)
