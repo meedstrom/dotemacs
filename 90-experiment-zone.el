@@ -1,5 +1,84 @@
 ;; Experiment zone -*- lexical-binding: t; -*-
 
+;; (find-olpath 20 )
+;; (find-olpath 23 )
+;; (find-olpath 24 )
+;; (find-olpath 94 )
+;; (find-olpath 96 )
+;; (find-olpath 109 )
+;; (find-olpath 150 )
+;; (find-olpath 200 )
+;; (find-olpath 220 )
+;; (find-olpath 221 )
+
+
+
+;; (construct-tree)
+
+
+
+(defun find-olpath (line tree)
+  "Given LINE number, return a list of line numbers corresponding to ancestor
+subtrees."
+  ;; car is line number
+  ;; cdr is outline level (nubmer of heading stars) of the local subtree
+  (let* ((relevant (cl-loop for row in tree
+                            when (> line (car row))
+                            collect row))
+         (reversed (nreverse relevant))
+         (curr-level (cdr (car reversed)))
+         (res (list (car (car reversed)))))
+    (cl-loop for row in reversed
+             when (> curr-level (cdr row))
+             do (setq curr-level (cdr row))
+             (push (car row) res))
+    res
+    ))
+
+;; (defun find-olpath (line tree)
+;;   "Given LINE number, return a list of line numbers corresponding to ancestor
+;; subtrees."
+;;   (let* ((relevant (cl-loop for row in tree
+;;                            when (> line (plist-get row :lnum))
+;;                            collect row))
+;;          (reversed (nreverse relevant))
+;;          (curr-level (plist-get (car reversed) :lvl))
+;;          res )
+;;     (cl-loop for row in reversed
+;;              when (>= curr-level (plist-get row :lvl))
+;;              do (setq curr-level (plist-get row :lvl))
+;;              and collect (plist-get row :lnum))
+;;     ))
+
+;; (defun find-olpath (line)
+;;   "Given LINE number, return a list of line numbers corresponding to ancestor
+;; subtrees."
+;;   (let* ((relevant (cl-loop for row in tbl
+;;                            when (> line (plist-get row :lnum))
+;;                            collect row))
+;;          (reversed (nreverse relevant))
+;;          (curr-level (plist-get (car reversed) :lvl))
+;;          res )
+;;     (cl-loop for row in reversed
+;;              when (>= curr-level (plist-get row :lvl))
+;;              do (setq curr-level (plist-get row :lvl))
+;;              (push (plist-get row :lnum) res))
+;;     res))
+
+;; (defun find-olpath (line)
+;;   (let* ((relevant (cl-loop for row in tbl
+;;                            when (> line (plist-get row :lnum))
+;;                            collect row))
+;;          (reversed (nreverse relevant))
+;;          (curr-level (plist-get (car reversed) :lvl))
+;;          (res (list (cons line curr-level))))
+;;     (cl-loop for row in reversed
+;;              when (> curr-level (plist-get row :lvl))
+;;              do (push (cons (plist-get row :lnum)
+;;                             (setq curr-level (plist-get row :lvl)))
+;;                       res))
+;;     res))
+
 
 ;; Reinvent the wheel.  Not so happy with `lwarn'...  A wrapper that hardcodes
 ;; arguments TYPE and LEVEL will indent more compactly like vanilla `error'.

@@ -9,7 +9,7 @@
 
 (setopt org-roam-link-auto-replace nil)
 (setopt org-roam-db-update-on-save nil)
-(setq org-roam-db-gc-threshold (* 4 1024 1024 1024)) ;; 4 GiB
+(setq org-roam-db-gc-threshold (* 4 1000 1000 1000))
 (setq org-element-cache-persistent nil)
 
 ;;; Stuff
@@ -78,7 +78,7 @@
           ("l" "Unsorted LW" plain
            ,(concat "* ${title}"
                     "\n:PROPERTIES:"
-                    "\n:ID:       %(org-id-uuid)"
+                    "\n:ID:       %(org-id-new)"
                     "\n:CREATED:  [%<%F>]"
                     "\n:ROAM_REFS: %^{ROAM_REFS}"
                     "\n:END:"

@@ -108,6 +108,19 @@
   (unless after-init-time
     (setq debug-on-error t)
     (error (message "Org loaded during init, I don't want this")))
+  ;; Regenerate org-id-locations if it's gone
+  (require 'org-id)
+  (unless (and (file-exists-p org-id-locations-file)
+               (org-id-locations-load)
+               (not (hash-table-empty-p org-id-locations)))
+    (org-id-update-id-locations
+     (--filter (and (not (string-search "/logseq/bak/" it))
+                    (not (string-search "/logseq/version-files/" it)))
+               (--mapcat (directory-files-recursively it "\\.org$")
+                         '("/home/kept/roam/"
+                           "/home/kept/archive/"
+                           "/home/kept/emacs/")))))
+
   (require 'named-timer)
   (named-timer-run :my-clock-reminder nil 600
                    (defun my-clock-remind ()

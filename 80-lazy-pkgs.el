@@ -13,26 +13,52 @@
 (use-package org-node
   :hook (org-mode . org-node-enable))
 
-;; slow, better tell org id locations about the dirs so it writes to disk
-;; (add-hook 'org-node-cache-mode-hook #'org-roam-update-org-id-locations)
-
 (setq debug-on-error t)
-;; (setq org-node-format-candidate-fn
-;;       (lambda (node title)
-;;         (concat (file-name-nondirectory (plist-get node :file-path))
-;;                 " -> "
-;;                 title)))
 
 (setq org-node-slug-fn #'org-node--slugify)
 (setq org-node-create-and-visit-fn #'org-node--basic-create-and-visit)
 (setq org-node-create-and-insert-fn #'org-node--basic-create-and-insert)
-(setq org-node-butler-upcase-properties nil)
+(setq org-node-butler-upcase-properties t)
 (setq org-node-butler-upcase-keywords t)
 (setq org-node-filter-fn
       (defun my-filter (node)
         (declare (pure t) (side-effect-free t))
         (and (not (plist-get node :todo))
              (not (plist-get node :roam-exclude)))))
+
+
+(after! org-node
+  ;; Make sure the extracted subtree inherits any CREATED property,
+  ;; else creates one for today
+  (advice-add 'org-node-extract-subtree :around
+              (lambda (fn &rest args)
+                (let ((parent-creation
+                       (save-excursion
+                         (while (not (or (bobp) (org-entry-get nil "CREATED")))
+                           (org-up-heading-or-point-min))
+                         (org-entry-get nil "CREATED"))))
+                  (apply fn args)
+                  (org-entry-put nil "CREATED"
+                                 (or parent-creation (format-time-string "[%F]"))))))
+
+  (require 'org-node-experimental)
+  (advice-add 'org-node-cache--scan :override #'org-node-experimental--scan)
+  ;; (advice-remove 'org-node-cache--scan #'org-node-experimental--scan)
+  (advice-add 'org-node-cache-reset :before #'org-node-experimental--clear-extra-hash-tables)
+  ;; (advice-remove 'org-node-cache-reset #'org-node-experimental--clear-extra-hash-tables)
+  (org-node-cache-reset)
+  (setq org-node-format-candidate-fn #'my-format-with-olp))
+
+(defun my-format-with-olp (node title)
+  "Prepend with the outline path."
+  (declare (side-effect-free t))
+  (concat
+   (cl-loop
+    for id in (org-node-experimental--olpath->ids
+               (plist-get node :file-path)
+               (plist-get node :pseudo-olpath))
+    concat (concat (plist-get (gethash id org-nodes) :title) " -> "))
+   title))
 
 (after! org-roam-mode
   (advice-add 'org-roam-backlinks-get :override #'org-node--fabricate-roam-backlinks))
