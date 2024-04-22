@@ -7,6 +7,7 @@
 ;;               (add-hook 'post-command-hook #'org-roam-buffer--redisplay-h 0 t)
 ;;               )))
 
+(setq org-roam-file-exclude-regexp '("/logseq/bak/" "/logseq/version-files/"))
 (setopt org-roam-link-auto-replace nil)
 (setopt org-roam-db-update-on-save nil)
 (setq org-roam-db-gc-threshold (* 4 1000 1000 1000))
