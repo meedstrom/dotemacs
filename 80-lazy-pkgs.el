@@ -15,18 +15,6 @@
 
 (setq debug-on-error t)
 
-(setq org-node-slug-fn #'org-node--slugify)
-(setq org-node-create-and-visit-fn #'org-node--basic-create-and-visit)
-(setq org-node-create-and-insert-fn #'org-node--basic-create-and-insert)
-(setq org-node-butler-upcase-properties t)
-(setq org-node-butler-upcase-keywords t)
-(setq org-node-filter-fn
-      (defun my-filter (node)
-        (declare (pure t) (side-effect-free t))
-        (and (not (plist-get node :todo))
-             (not (plist-get node :roam-exclude)))))
-
-
 (after! org-node
   ;; Make sure the extracted subtree inherits any CREATED property,
   ;; else creates one for today

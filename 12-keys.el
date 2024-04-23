@@ -51,9 +51,9 @@
 (keymap-set global-map "<f2> e s" #'ess-eval-region-or-function-or-paragraph-and-step) ;; ess everywhere
 (keymap-set global-map "<f2> e x" #'eval-expression)
 (keymap-set global-map "<f2> f" #'org-node-find)
+(keymap-set global-map "<f2> i" #'org-node-insert-link)
 (keymap-set global-map "<f2> g" #'git-timemachine)
 (keymap-set global-map "<f2> h" #'consult-find)
-(keymap-set global-map "<f2> i" #'org-node-insert-link)
 (keymap-set global-map "<f2> j" #'+default/find-file-under-here)
 (keymap-set global-map "<f2> k" #'+default/search-project)
 (keymap-set global-map "<f2> l" #'helm-locate)
@@ -287,9 +287,19 @@
 ;; - Translate keys globally, and use EXWM simulation keys to translate back
 ;;   into a real escape for other apps
 
+;; (define-key function-key-map    (kbd "<escape>") nil)
+;; (define-key key-translation-map (kbd "<escape>") nil)
+;; (define-key input-decode-map    (kbd "<escape>") nil)
+
 (define-key function-key-map    (kbd "<escape>") (kbd "C-g"))
 (define-key key-translation-map (kbd "<escape>") (kbd "C-g"))
 (define-key input-decode-map    (kbd "<escape>") (kbd "C-g"))
+
+;; broken
+;; https://lists.gnu.org/archive/html/emacs-devel/2008-09/msg00638.html
+(set-quit-char ?\[)
+
+
 
 
 ;;; More repeaters! Repeaters are love and life.

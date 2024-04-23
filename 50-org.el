@@ -19,7 +19,6 @@
 (setopt org-agenda-ignore-properties '(stats)) ;; perf
 (setopt org-agenda-inhibit-startup t) ;; perf
 (setopt org-archive-save-context-info '(time file itags olpath))
-(setopt org-attach-id-dir "static/")
 (setopt org-pomodoro-play-sounds nil)
 (setopt org-export-backends '(html latex odt texinfo))
 (setopt org-export-with-toc nil)
@@ -45,6 +44,8 @@
 (setopt org-clock-x11idle-program-name (or (executable-find "xprintidle") "x11idle"))
 (setopt org-replace-disputed-keys t)
 (setopt org-tags-column 0)
+(setopt org-download-heading-lvl nil)
+(setopt org-download-image-dir "img/")
 
 ;; (setq-default org-display-custom-times t) ;; could it cause org-element bugs due to daily page titles?
 (setopt org-agenda-files

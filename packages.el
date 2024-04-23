@@ -116,14 +116,10 @@
 (package! awesome-tray :recipe (:host github :repo "manateelazycat/awesome-tray"))
 
 ;; Org
-(package! vulpea)
 (package! org-anki)
-(package! org-transclusion
-  :recipe (:pre-build (("make" "org-transclusion.org")
-                       ("make" "-C" "./docs" "org-transclusion.texi")
-                       ("makeinfo" "./docs/org-transclusion.texi" "-o" "./docs/org-transclusion.info")
-                       ("install-info" "./docs/org-transclusion.info" "./docs/dir"))))
+(package! org-transclusion)
 (package! org-roam)
+(package! org-download)
 (package! htmlize)
 (package! delve :recipe (:host github :repo "publicimageltd/delve"))
 ;; (package! org-recent-headings)
@@ -132,7 +128,7 @@
 ;; (package! org-tanglesync)
 ;; (package! ox-rss)
 
-;; Much copypasta from Doom module (the complexity is to permit downloading a
+;; Copypasta from Doom module (the complexity permits downloading a
 ;; shallow clone, normally you can't build Org from a shallow clone).
 (package! org
   :recipe (:host github

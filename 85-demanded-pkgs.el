@@ -1,9 +1,16 @@
 ;; -*- lexical-binding: t; -*-
 
 (run-with-idle-timer 10 nil #'require 'org)
-(run-with-idle-timer 12 nil #'require 'org-roam)
-(run-with-idle-timer 14 nil #'require 'dired)
-(run-with-idle-timer 16 nil #'require 'eshell)
+(run-with-idle-timer 11 nil #'require 'org-roam)
+(run-with-idle-timer 12 nil #'require 'dired)
+(run-with-idle-timer 7 nil #'require 'eshell)
+(run-with-idle-timer 8 nil #'require 'esh-mode)
+(run-with-idle-timer 9 nil (lambda ()
+                             ;; Preload all eshell modules by just creating an
+                             ;; eshell buffer in the background
+                             (save-window-excursion
+                               (eshell)
+                               (bury-buffer))))
 
 (require 'beginend)
 (beginend-global-mode)
@@ -21,7 +28,6 @@
 (advice-add #'kill-emacs :before (lambda (&rest _) (setq kill-emacs-hook nil)))
 
 (use-package circadian
-  :disabled
   :config
   (el-patch-defun circadian-a-earlier-b-p (time-a time-b)
     "Compare to time strings TIME-A and TIME-B by hour and minutes."
@@ -29,6 +35,9 @@
              ((el-patch-swap <= <) (cl-second time-a) (cl-second time-b)))
         (< (cl-first time-a) (cl-first time-b))))
   ;; (add-hook 'circadian-after-load-theme-hook #'prism-set-colors)
+  ;; Close enough
+  (setq calendar-latitude 60)
+  (setq calendar-longitude 10)
   (setopt circadian-themes '(("5:00" . doom-gruvbox-light)
                              ("11:00" . doom-flatwhite)
                              ("15:00" . doom-sourcerer)
