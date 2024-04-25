@@ -49,6 +49,7 @@
    title))
 
 (after! org-roam-mode
+  ;; (advice-remove 'org-roam-backlinks-get #'org-node--fabricate-roam-backlinks)
   (advice-add 'org-roam-backlinks-get :override #'org-node--fabricate-roam-backlinks))
 
 (setopt helpful-max-buffers nil) ;; what's the point of killing buffers
