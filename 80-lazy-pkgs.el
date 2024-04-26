@@ -19,23 +19,24 @@
   ;; Make sure the extracted subtree inherits any CREATED property,
   ;; else creates one for today
   (advice-add 'org-node-extract-subtree :around
-              (lambda (fn &rest args)
+              (lambda (orig-fn &rest args)
                 (let ((parent-creation
                        (save-excursion
                          (while (not (or (bobp) (org-entry-get nil "CREATED")))
                            (org-up-heading-or-point-min))
                          (org-entry-get nil "CREATED"))))
-                  (apply fn args)
+                  (apply orig-fn args)
                   (org-entry-put nil "CREATED"
                                  (or parent-creation (format-time-string "[%F]"))))))
 
   (require 'org-node-experimental)
-  (advice-add 'org-node-cache--scan :override #'org-node-experimental--scan)
-  ;; (advice-remove 'org-node-cache--scan #'org-node-experimental--scan)
-  (advice-add 'org-node-cache-reset :before #'org-node-experimental--clear-extra-hash-tables)
   ;; (advice-remove 'org-node-cache-reset #'org-node-experimental--clear-extra-hash-tables)
+  ;; (advice-remove 'org-node-cache--scan #'org-node-experimental--scan)
+  ;; (advice-add 'org-node-cache--scan :override #'org-node-experimental--scan)
+  ;; (advice-add 'org-node-cache-reset :before #'org-node-experimental--clear-extra-hash-tables)
   (org-node-cache-reset)
-  (setq org-node-format-candidate-fn #'my-format-with-olp))
+  ;; (setq org-node-format-candidate-fn #'my-format-with-olp)
+  )
 
 (defun my-format-with-olp (node title)
   "Prepend with the outline path."
