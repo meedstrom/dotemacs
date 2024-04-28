@@ -13,6 +13,7 @@
 (setopt kill-ring-max 600)
 (setopt view-read-only t)
 (setopt indent-tabs-mode nil)
+(setopt debug-on-error t)
 (setopt vc-msg-newbie-friendly-msg nil)
 (setopt vc-msg-copy-id-to-kill-ring nil)
 (setopt shift-select-mode nil)

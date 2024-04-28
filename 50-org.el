@@ -29,6 +29,7 @@
 (setopt org-clock-in-resume t)
 (setopt org-catch-invisible-edits 'smart)
 (setopt org-ctrl-k-protect-subtree t)
+(setopt org-M-RET-may-split-line '((headline . nil) (default . t)))
 (setopt org-cycle-separator-lines 3)
 (setopt org-datetree-add-timestamp nil)
 (setopt org-edit-src-content-indentation 0)

@@ -6,15 +6,25 @@
   :commands hkey-either)
 (use-package goggles
   :hook ((prog-mode text-mode) . goggles-mode))
-(use-package iscroll
-  :hook ((text-mode elfeed-show-mode eww-mode shr-mode) . iscroll-mode))
+;; maybe this is the one that subtly messes with undo?
+;; (use-package iscroll
+;;   :hook ((text-mode elfeed-show-mode eww-mode shr-mode) . iscroll-mode))
 (use-package! nov
   :mode ("\\.epub\\'" . nov-mode))
 (use-package org-node
   :hook (org-mode . org-node-enable))
 
-(setq debug-on-error t)
-
+(setq org-node-only-show-subtrees-with-id t)
+(setq org-capture-templates
+      '(("n" "ID node" plain (function org-node-capture-target))))
+(setq org-node-creation-fn #'org-capture)
+(setq org-node-format-candidate-fn #'my-format-with-olp)
+(defun my-format-with-olp (node title)
+  "Prepend subtree completions with the outline path."
+  (declare (pure t) (side-effect-free t))
+  (if-let ((olp (plist-get node :olp)))
+      (concat (string-join olp " > ") " > " title)
+    title))
 (after! org-node
   ;; Make sure the extracted subtree inherits any CREATED property,
   ;; else creates one for today
@@ -27,27 +37,9 @@
                          (org-entry-get nil "CREATED"))))
                   (apply orig-fn args)
                   (org-entry-put nil "CREATED"
-                                 (or parent-creation (format-time-string "[%F]"))))))
+                                 (or parent-creation (format-time-string "[%F]")))))))
 
-  (require 'org-node-experimental)
-  ;; (advice-remove 'org-node-cache-reset #'org-node-experimental--clear-extra-hash-tables)
-  ;; (advice-remove 'org-node-cache--scan #'org-node-experimental--scan)
-  ;; (advice-add 'org-node-cache--scan :override #'org-node-experimental--scan)
-  ;; (advice-add 'org-node-cache-reset :before #'org-node-experimental--clear-extra-hash-tables)
-  (org-node-cache-reset)
-  ;; (setq org-node-format-candidate-fn #'my-format-with-olp)
-  )
 
-(defun my-format-with-olp (node title)
-  "Prepend with the outline path."
-  (declare (side-effect-free t))
-  (concat
-   (cl-loop
-    for id in (org-node-experimental--olpath->ids
-               (plist-get node :file-path)
-               (plist-get node :pseudo-olpath))
-    concat (concat (plist-get (gethash id org-nodes) :title) " -> "))
-   title))
 
 (after! org-roam-mode
   ;; (advice-remove 'org-roam-backlinks-get #'org-node--fabricate-roam-backlinks)
