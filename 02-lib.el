@@ -6,12 +6,27 @@
 (require 'dash)
 (require 'crux)
 
+(defun my-make-id* ()
+  "Make a 6-character string of non-vowel letters."
+  (my-int-to-consonants (+ 4084101 (random 81682019))))
+
+;; (fset 'org-id-new #'my-make-id)
+(defun my-make-id (&rest _)
+  (my-random-string 5 "bcdfghjklmnpqrstvwxyz"))
+
+(defun my-random-string (n-chars alphabet)
+  (let ((chars (string-to-list alphabet))
+        (alphabet-length (length alphabet)))
+    (concat
+     (cl-loop repeat n-chars collect (nth (random alphabet-length) chars)))))
+
 ;; WIP
 (defun my-bright-switch ()
   "Switch between 1%, 10% and 100% monitor brightness."
   (interactive)
   )
 
+;; Nice if you don't have auto-save-visited-mode
 ;; (add-hook 'after-save-hook #'my-eval-buffer-if-elisp)
 (defun my-eval-buffer-if-elisp ()
   (and (derived-mode-p 'emacs-lisp-mode)

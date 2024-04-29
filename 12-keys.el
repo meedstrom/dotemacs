@@ -187,10 +187,13 @@
 (setopt doom-leader-alt-key "<f3>")
 (setopt doom-localleader-alt-key "<f4>")
 
+;; Vimmers' obsession with typing capital letters, I swear...  There needs to
+;; exist an alternative module like this but that binds no capital letters.
 (after! doom-keybinds
-  (keymap-set doom-leader-map "f d" (keymap-lookup doom-leader-map "f D")))
+  (keymap-set doom-leader-map "f d" (keymap-lookup doom-leader-map "f D"))
+  (keymap-set doom-leader-map "f c" (keymap-lookup doom-leader-map "f C")))
 
-;; Org localleader (on a hook to override)
+;; Overrides for Org localleader
 (my-hook-once 'org-load-hook
   (map! :map org-mode-map :localleader "i" #'my-org-id-get-create-and-copy)
   (map! :map org-mode-map :localleader "h" #'my-insert-heading-with-id))

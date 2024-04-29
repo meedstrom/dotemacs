@@ -14,6 +14,7 @@
 (use-package org-node
   :hook (org-mode . org-node-enable))
 
+(setq org-node-ask-directory nil)
 (setq org-node-only-show-subtrees-with-id t)
 (setq org-capture-templates
       '(("n" "ID node" plain (function org-node-capture-target))))

@@ -121,7 +121,7 @@
                (--mapcat (directory-files-recursively it "\\.org$")
                          '("/home/kept/roam/"
                            "/home/kept/archive/"
-                           "/home/kept/emacs/")))))
+                           "/home/kept/private-dotfiles/.doom.d/")))))
 
   (require 'named-timer)
   (named-timer-run :my-clock-reminder nil 600
