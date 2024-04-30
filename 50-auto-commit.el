@@ -71,16 +71,16 @@ Suitable on `after-save-hook'."
               ;; TODO: check if you pushed this auto-commit to origin. then we need
               ;;       a new commit.
               ;;       somethign (magit-get-current-remote)
-              (if (and (equal last-commit-date (format-time-string "%F"))
-                       (equal last-commit-msg "Auto-commit"))
-                  ;; Same day, so amend today's autocommit
-                  (magit-commit-amend '("--all" "--reuse-message=HEAD"))
-                ;; New day, new commit
-                (magit-commit-create '("--all" "--message=Auto-commit")))
-              ;; Maybe also push the newly committed changes
-              (when (member (project-root project) my-auto-pull-and-push-dirs)
-                (vc-pull-and-push))
-              )))))))
+              (when (magit-unstaged-files)
+                (if (and (equal last-commit-date (format-time-string "%F"))
+                         (equal last-commit-msg "Auto-commit"))
+                    ;; Same day, so amend today's autocommit
+                    (magit-commit-amend '("--all" "--reuse-message=HEAD"))
+                  ;; New day, new commit
+                  (magit-commit-create '("--all" "--message=Auto-commit")))
+                ;; Maybe also push the newly committed changes
+                (when (member (project-root project) my-auto-pull-and-push-dirs)
+                  (vc-pull-and-push))))))))))
 
 (define-minor-mode my-auto-commit-mode
   "Automatically git-commit on save, in select directories."

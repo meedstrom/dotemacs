@@ -22,6 +22,7 @@
 ;; Disable Doom-installed stuff
 (package! org-crypt :disable t) ;; slowwww
 (package! helpful :disable t) ;; slowwww
+(package! which-key :disable t) ;; slowwww
 (package! doom-snippets :disable t) ;; doom's yasnippets
 
 ;; The rest

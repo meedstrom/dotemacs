@@ -11,40 +11,6 @@
 ;;   :hook ((text-mode elfeed-show-mode eww-mode shr-mode) . iscroll-mode))
 (use-package! nov
   :mode ("\\.epub\\'" . nov-mode))
-(use-package org-node
-  :hook (org-mode . org-node-enable))
-
-(setq org-node-ask-directory nil)
-(setq org-node-only-show-subtrees-with-id t)
-(setq org-capture-templates
-      '(("n" "ID node" plain (function org-node-capture-target))))
-(setq org-node-creation-fn #'org-capture)
-(setq org-node-format-candidate-fn #'my-format-with-olp)
-(defun my-format-with-olp (node title)
-  "Prepend subtree completions with the outline path."
-  (declare (pure t) (side-effect-free t))
-  (if-let ((olp (plist-get node :olp)))
-      (concat (string-join olp " > ") " > " title)
-    title))
-(after! org-node
-  ;; Make sure the extracted subtree inherits any CREATED property,
-  ;; else creates one for today
-  (advice-add 'org-node-extract-subtree :around
-              (lambda (orig-fn &rest args)
-                (let ((parent-creation
-                       (save-excursion
-                         (while (not (or (bobp) (org-entry-get nil "CREATED")))
-                           (org-up-heading-or-point-min))
-                         (org-entry-get nil "CREATED"))))
-                  (apply orig-fn args)
-                  (org-entry-put nil "CREATED"
-                                 (or parent-creation (format-time-string "[%F]")))))))
-
-
-
-(after! org-roam-mode
-  ;; (advice-remove 'org-roam-backlinks-get #'org-node--fabricate-roam-backlinks)
-  (advice-add 'org-roam-backlinks-get :override #'org-node--fabricate-roam-backlinks))
 
 (setopt helpful-max-buffers nil) ;; what's the point of killing buffers
 (setopt iflipb-wrap-around t)

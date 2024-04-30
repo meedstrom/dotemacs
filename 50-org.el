@@ -47,6 +47,42 @@
 (setopt org-tags-column 0)
 (setopt org-download-heading-lvl nil)
 (setopt org-download-image-dir "img/")
+(setopt org-node-creation-fn #'org-capture)
+
+(use-package org-node
+  :hook ((org-mode . org-node-backlinks-mode)
+         (org-mode . org-node-cache-mode)))
+
+(setopt org-node-format-candidate-fn
+        (lambda (node title)
+          (if-let ((olp (org-node-olp node)))
+              (concat (string-join olp " > ") " > " title)
+            title)))
+
+(after! org-node
+  ;; Make sure the extracted subtree inherits any CREATED property,
+  ;; else creates one for today
+  (advice-add 'org-node-extract-subtree :around
+              (lambda (orig-fn &rest args)
+                (let ((parent-creation
+                       (save-excursion
+                         (while (not (or (bobp) (org-entry-get nil "CREATED")))
+                           (org-up-heading-or-point-min))
+                         (org-entry-get nil "CREATED"))))
+                  (apply orig-fn args)
+                  (org-entry-put nil "CREATED"
+                                 (or parent-creation (format-time-string "[%F]")))))))
+
+(setq org-capture-templates
+      '(("n" "ID node" plain (function org-node-capture-target))
+        ("i" "instantly create" plain (function org-node-capture-target)
+         nil )))
+
+
+;; (after! org-roam-mode
+;;   ;; (advice-remove 'org-roam-backlinks-get #'org-node--fabricate-roam-backlinks)
+;;   (advice-add 'org-roam-backlinks-get :override #'org-node--fabricate-roam-backlinks))
+
 
 ;; (setq-default org-display-custom-times t) ;; could it cause org-element bugs due to daily page titles?
 (setopt org-agenda-files
@@ -163,4 +199,4 @@
 
 ;;; Workaround the tide of org-element parser bugs since 9.5 rewrite
 
-(setq org-element-use-cache nil)
+;; (setq org-element-use-cache nil)

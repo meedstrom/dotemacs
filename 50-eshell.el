@@ -1,94 +1,16 @@
 ;; Eshell config -*- lexical-binding: t; -*-
+;; See also 02-lib-eshell.el
 
-;; Wishlist:
 
-;; - Unbreak the prompts occasionally going read-only
-;;   (Fixed by just not applying read-only)
-
-;; - Stop writing .eshell-scrolback and .eshell-command-history, keep track in
-;;   .emacs.d/cache/ instead
-
-;;   - Stretch goal: For robustness, attempt to sync to at least two places:
-;;     locally in the dir AND in .emacs.d.  To merge mismatched syncs, just add
-;;     together the logs, which are of course timestamped to the unix
-;;     nanosecond, sort by time, and dedup. This way, the local dir file can
-;;     regenerate from .emacs.d, and .emacs.d can regenerate from the local dir
-;;     file!  And local file need not exist at all (helps when dir unwritable,
-;;     or when the user disabled writing local files).
-
-(require 'subr-x)
-
-(set-eshell-alias! "less" "view-file $1")
-
-;; TODO: Automatically do scroll-right after coming off a long line
-;; (add-hook 'window-scroll-functions
-;;           (defun my-watch-next-line-motion ()
-;;             (advice-add 'forward-line)
-;;             ) 0 t)
-;; (defun my-reset-hscroll (&rest _)
-;;   (run-with-timer
-;;    .1 nil
-;;    (lambda ()
-;;      (when (< (current-column) 80)
-;;        (advice-remove 'line-move-finish #'my-reset-hscroll)
-;;        (advice-remove 'mouse-set-point #'my-reset-hscroll)
-;;        (advice-remove 'goto-char #'my-reset-hscroll)
-;;        (advice-remove 'forward-char #'my-reset-hscroll)
-;;        (advice-remove 'backward-char #'my-reset-hscroll)
-;;        (scroll-right most-positive-fixnum))))
-;;   _)
-;; (advice-add 'set-window-hscroll :after
-;;             (defun my-watch-point-motion (&rest _)
-;;               (advice-add 'line-move-finish :after #'my-reset-hscroll)
-;;               (advice-add 'mouse-set-point :after #'my-reset-hscroll)
-;;               (advice-add 'goto-char :after #'my-reset-hscroll)
-;;               (advice-add 'forward-char :after #'my-reset-hscroll)
-;;               (advice-add 'backward-char :after #'my-reset-hscroll)
-;;               _))
-;; HACK b/c i can't seem to hook anything onto when auto-hscroll-mode does its
-;;      thing, it doesnt call set-window-hscroll
-;; (named-timer-run :my-hscroll-reset .2 .2
-;;                  (defun my-hscroll-reset ()
-;;                    (and (/= 0 (window-hscroll))
-;;                         (< (current-column) (window-width))
-;;                         (scroll-right most-positive-fixnum))))
-
-;; (use-package eshell
-;;   :defer
-;;   :custom
-;;   ((eshell-prompt-function
-;;    (lambda ()
-;;      (concat "[--:--] " (if (>= my-esh-backref-counter 35)
-;;                             "---"
-;;                           "--") " λ ")))
-;;    (eshell-prompt-regexp
-;;    (rx (?? bol "Command finished, " (*? anychar))
-;;        "[" (= 5 nonl) "]" (* nonl) " λ "))
-;;    (eshell-scroll-show-maximum-output nil)
-;;    (eshell-show-lisp-completions t)
-;;    (eshell-banner-message
-;;    '(concat "Favored/recent files:\n"
-;;             (loopy (list item (my-recentf-for-motd))
-;;                    (concat (concat "\n   \"" item "\"")))
-;;             "\n\n"))))
-
-(defun my-commands-starting-with (prefix)
-  (let (commands)
-    (mapatoms (lambda (sym)
-                (and (commandp sym)
-                     (string-prefix-p prefix (symbol-name sym))
-                     (push sym commands))))
-    commands))
-
-;; (my-syms-starting-with "my-esh-")
-
-;; OK, so using a regexp is pretty unreliable.  The way shell-mode does it, it
-;; has a shell-prompt-pattern, but won't use it by default for anything other
-;; than C-c C-p motion.  Instead, it relies on comint use of the "field" text
-;; property to mark a prompt.  Docstring of `shell-prompt-pattern' says: The
-;; pattern should probably not match more than one line.  If it does, Shell mode
-;; may become confused trying to distinguish prompt from input on lines which
-;; don't start with a prompt.
+;; Used to try implementing a multiline prompt -- it's pretty unreliable.  The
+;; way shell-mode does it, it has a `shell-prompt-pattern', but won't use it by
+;; default for anything other than C-c C-p motion.  Instead, it relies on
+;; comint using the "field" text property to mark a prompt.  Docstring of
+;; `shell-prompt-pattern' says: "The pattern should probably not match more
+;; than one line.  If it does, Shell mode may become confused trying to
+;; distinguish prompt from input on lines which don't start with a prompt."
+;;
+;; Anyhoo... A single-line prompt can be plenty informative.
 (after! eshell
   (setopt eshell-prompt-function (lambda () "〈 ／／ 〉 "))
   (setopt eshell-prompt-regexp "^〈 .*? 〉 ")
@@ -136,8 +58,9 @@
 (add-hook 'eshell-post-command-hook #'my-esh-time-cmd-2)
 ;; (add-hook 'eshell-post-command-hook #'end-of-buffer)
 
-(hookgen eshell-mode-hook
-  (add-hook 'post-command-hook #'scroll-right nil t))
+(add-hook 'eshell-mode-hook
+          (defun my-esh-add-local-post-command-hook ()
+            (add-hook 'post-command-hook #'scroll-right nil t)))
 
 ;; Always time slow commands. No more rerunning just to prepend "time ..."
 (add-hook 'my-real-eshell-post-command-hook #'my-esh-print-elapsed-maybe)
@@ -152,7 +75,7 @@
 ;; Timestamp the exact time they command was executed
 (add-hook 'eshell-pre-command-hook #'my-esh-timestamp-update)
 
-;; Name the buffer so I can see the direetory in the minibuffer.
+;; Name the buffer so I can see the directory on the modeline.
 (add-hook 'eshell-directory-change-hook #'my-esh-rename)
 (add-hook 'eshell-mode-hook #'my-esh-rename)
 
@@ -211,3 +134,18 @@
 (defun eshell/b (&optional _args)
   (let ((default-directory (file-name-parent-directory default-directory)))
     (my-esh-here)))
+
+(set-eshell-alias! "less" "view-file $1")
+
+;; Wishlist:
+
+;; - Stop the experiments of .eshell-scrollback and .eshell-command-history,
+;;   keep track in .emacs.d/cache/ instead
+
+;;   - Stretch goal: For robustness, attempt to sync to at least two places:
+;;     locally in the dir AND in .emacs.d.  To merge mismatched syncs, just add
+;;     together the logs, which are of course timestamped to the unix
+;;     nanosecond, sort by time, and dedup. This way, the local dir file can
+;;     regenerate from .emacs.d, and .emacs.d can regenerate from the local dir
+;;     file!  And local file need not exist at all (helps when dir unwritable,
+;;     or when the user disabled writing local files).

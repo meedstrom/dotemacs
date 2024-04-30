@@ -6,6 +6,15 @@
 (require 'dash)
 (require 'crux)
 
+
+(defun my-commands-starting-with (prefix)
+  (let (commands)
+    (mapatoms (lambda (sym)
+                (and (commandp sym)
+                     (string-prefix-p prefix (symbol-name sym))
+                     (push sym commands))))
+    commands))
+
 (defun my-make-id* ()
   "Make a 6-character string of non-vowel letters."
   (my-int-to-consonants (+ 4084101 (random 81682019))))
