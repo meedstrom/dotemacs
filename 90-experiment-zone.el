@@ -1,8 +1,6 @@
 ;; Experiment zone -*- lexical-binding: t; -*-
 
-;; KDE Wayland
-(setq gif-screencast-program "spectacle")
-(setq gif-screencast-args (list "-anbo"))
+
 
 (hookgen doom-after-init-hook
   (setq my-stim-collection (my-stim-collection-generate)))

@@ -50,8 +50,10 @@
 (setopt org-node-creation-fn #'org-capture)
 
 (use-package org-node
-  :hook ((org-mode . org-node-backlinks-mode)
+  :hook ((org-mode . org-node-backlink-mode)
          (org-mode . org-node-cache-mode)))
+
+(setq org-node-perf-assume-coding-system 'utf-8-unix)
 
 (setopt org-node-format-candidate-fn
         (lambda (node title)
@@ -74,15 +76,21 @@
                                  (or parent-creation (format-time-string "[%F]")))))))
 
 (setq org-capture-templates
-      '(("n" "ID node" plain (function org-node-capture-target))
-        ("i" "instantly create" plain (function org-node-capture-target)
-         nil )))
-
+      '(("n" "ID node")
+        ("nc" "Capture to ID node (maybe creating it)"
+         plain (function org-node-capture-target) nil
+         :empty-lines-after 1)
+        ("nv" "Visit ID node (maybe creating it)"
+         plain (function org-node-capture-target) nil
+         :jump-to-captured t
+         :immediate-finish t)
+        ("ni" "Instantly create ID node without content & without visiting"
+         plain (function org-node-capture-target) nil
+         :immediate-finish t)))
 
 ;; (after! org-roam-mode
 ;;   ;; (advice-remove 'org-roam-backlinks-get #'org-node--fabricate-roam-backlinks)
 ;;   (advice-add 'org-roam-backlinks-get :override #'org-node--fabricate-roam-backlinks))
-
 
 ;; (setq-default org-display-custom-times t) ;; could it cause org-element bugs due to daily page titles?
 (setopt org-agenda-files
@@ -157,7 +165,7 @@
                (--mapcat (directory-files-recursively it "\\.org$")
                          '("/home/kept/roam/"
                            "/home/kept/archive/"
-                           "/home/kept/private-dotfiles/.doom.d/")))))
+                           "/home/me/.doom.d/")))))
 
   (require 'named-timer)
   (named-timer-run :my-clock-reminder nil 600

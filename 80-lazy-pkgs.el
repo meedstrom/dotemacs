@@ -12,6 +12,10 @@
 (use-package! nov
   :mode ("\\.epub\\'" . nov-mode))
 
+;; Support KDE Wayland
+(setq gif-screencast-program "spectacle")
+(setq gif-screencast-args (list "-anbo"))
+
 (setopt helpful-max-buffers nil) ;; what's the point of killing buffers
 (setopt iflipb-wrap-around t)
 (setopt ranger-map-style 'emacs)

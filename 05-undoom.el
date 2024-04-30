@@ -1,6 +1,6 @@
 ;; Reverse some Doom Emacs defaults -*- lexical-binding: t; -*-
 
-;; Yep... long slow init please!
+;; Yep... give me a long slow init please!
 (add-hook 'emacs-startup-hook
           (defun my-eager-startup ()
             (run-hooks 'doom-first-input-hook)

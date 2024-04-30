@@ -70,6 +70,12 @@
 ;; When I'm not on a tiling WM, maximized Emacs acts as my wallpaper.
 ;; (add-to-list 'initial-frame-alist '(fullscreen . fullboth))
 (add-to-list 'initial-frame-alist '(fullscreen . maximized))
+(add-to-list 'default-frame-alist '(alpha-background . 30))
+
+(defun my-transp-background ()
+  (interactive)
+  (set-frame-parameter nil 'alpha-background 80)
+  (set-face-background 'default "#000"))
 
 
 ;;; Font
