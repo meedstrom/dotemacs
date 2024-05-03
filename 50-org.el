@@ -53,6 +53,7 @@
   :hook ((org-mode . org-node-backlink-mode)
          (org-mode . org-node-cache-mode)))
 
+(setq org-node-perf-multicore t)
 (setq org-node-perf-assume-coding-system 'utf-8-unix)
 
 (setopt org-node-format-candidate-fn

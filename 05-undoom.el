@@ -69,7 +69,33 @@
 ;; FIXME: This snippet makes the setting t before and after init but not during
 ;; init, which is where I want it to be t.  Guess I'll just have to make a
 ;; habit of launching emacs every time with "doom sync && emacs" while I'm
-;; developing a package.
+;; developing a package.  Which is, you know... every time I relaunch emacs.
+;; Maybe a fix would be to load-prefer-newer your local packages?
 (setopt load-prefer-newer t) ;; don't spend another minute confused by this
 (general-after-init
   (setopt load-prefer-newer t))
+
+;; "Because an 80 char wide Emacs window starts wrapping at 79."
+;; --Guido van Rossum, on why Python style mandates 79 columns
+;; https://www.reddit.com/r/learnpython/comments/1h2eug
+;;
+;; Even in other editors, a fill-column of exactly 80 can't ever play well with
+;; an editor window that's exactly 80 wide.  There's a reason many traditional
+;; styles actually mandate 72 or something.  79 is the absolute upper limit.
+;; 80 is for people who don't realize how bad their code looks on real 80-wide
+;; windows, because they always happen to have some margin i.e. splitting their
+;; screen gives them 2*87 or some such, not 2*80.
+;;
+;; So why don't I just set my frames to a multiple of at least 81?  My current
+;; hardware.  My monitor+font fits exactly 2x80, yay!  Fully optimized screen
+;; estate!  But it's a cursed windfall...  Shrinking the font one notch is not
+;; an option since that would take it all the way down to 2x110 or so (wasn't
+;; hiDPI supposed to give us more granular font sizes?).  I want the text as
+;; big as will fit.
+(after! doom-editor
+  (setq-default fill-column 79))
+(general-after-init
+  (setq-default fill-column 79))
+;; why is something changing it
+(setq-default fill-column 79)
+(hookgen emacs-lisp-mode-hook (setq-default fill-column 79))

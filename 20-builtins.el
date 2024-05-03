@@ -14,6 +14,7 @@
 (setopt view-read-only t)
 (setopt indent-tabs-mode nil)
 (setopt debug-on-error t)
+(delq 'user-error debug-ignored-errors) ;; Also enter debugger for `user-error'
 (setopt vc-msg-newbie-friendly-msg nil)
 (setopt vc-msg-copy-id-to-kill-ring nil)
 (setopt shift-select-mode nil)
@@ -47,17 +48,6 @@
 (after! recentf
   (setopt recentf-max-saved-items nil))
 
-;; "Because an 80 char wide Emacs window starts wrapping at 79."
-;; --Guido van Rossum, on why Python style mandates 79 columns
-;; https://www.reddit.com/r/learnpython/comments/1h2eug
-;;
-;; Most times you have a problem like that, you can just set your windows to 81
-;; chars wide, but in my case, my current screen+font fits exactly 2x80, a
-;; cursed windfall since it limits me as much as a physical terminal.
-;; Shrinking the font one notch is not an option since that would take it all
-;; the way down to 2x110 or so.  I want the text as big as will fit.
-(after! doom-editor
-  (setq-default fill-column 79))
 
 
 ;;; Calendar...
