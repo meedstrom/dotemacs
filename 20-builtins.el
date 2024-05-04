@@ -87,6 +87,8 @@
           (holiday-fixed 4 1 "Karin's birthday")
           (holiday-fixed 4 11 "Griselda's birthday")
           (holiday-fixed 4 25 "Lena Duske's birthday")
+          (holiday-fixed 4 29 "Thor's birthday")
+          (holiday-fixed 5 5 "Jesus' birthday")
           (holiday-fixed 6 18 "Rickard's birthday")
           (holiday-fixed 6 27 "Yang Yu Ting's birthday")
           (holiday-fixed 7 5 "Nath's birthday")
@@ -107,7 +109,6 @@
 
 ;; add these birthdays
 ;; - Cristina
-;; - Jesus
 ;; - Laia
 ;; - Marc-Antoine
 ;; - Mirela

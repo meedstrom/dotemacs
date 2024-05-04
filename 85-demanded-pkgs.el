@@ -29,24 +29,24 @@
 (eager-state-preempt-kill-emacs-hook-mode)
 (advice-add #'kill-emacs :before (lambda (&rest _) (setq kill-emacs-hook nil)))
 
-(use-package circadian
-  :config
-  ;; (el-patch-defun circadian-a-earlier-b-p (time-a time-b)
-  ;;   "Compare to time strings TIME-A and TIME-B by hour and minutes."
-  ;;   (or (and (= (cl-first time-a) (cl-first time-b))
-  ;;            ((el-patch-swap <= <) (cl-second time-a) (cl-second time-b)))
-  ;;       (< (cl-first time-a) (cl-first time-b))))
+;; (use-package circadian
+;;   :config
+;;   ;; (el-patch-defun circadian-a-earlier-b-p (time-a time-b)
+;;   ;;   "Compare to time strings TIME-A and TIME-B by hour and minutes."
+;;   ;;   (or (and (= (cl-first time-a) (cl-first time-b))
+;;   ;;            ((el-patch-swap <= <) (cl-second time-a) (cl-second time-b)))
+;;   ;;       (< (cl-first time-a) (cl-first time-b))))
 
-  ;; (add-hook 'circadian-after-load-theme-hook #'prism-set-colors)
-  ;; Close enough
-  (setq calendar-latitude 60)
-  (setq calendar-longitude 10)
-  (setopt circadian-themes '(("5:00" . doom-gruvbox-light)
-                             ("11:00" . doom-flatwhite)
-                             ("11:40" . doom-gruvbox)
-                             ("15:00" . doom-sourcerer)
-                             ("18:00" . ef-rosa)))
-  (circadian-setup))
+;;   ;; (add-hook 'circadian-after-load-theme-hook #'prism-set-colors)
+;;   ;; Close enough
+;;   (setq calendar-latitude 60)
+;;   (setq calendar-longitude 10)
+;;   (setopt circadian-themes '(("5:00" . doom-gruvbox-light)
+;;                              ("11:00" . doom-flatwhite)
+;;                              ("11:40" . doom-gruvbox)
+;;                              ("15:00" . doom-sourcerer)
+;;                              ("18:00" . ef-rosa)))
+;;   (circadian-setup))
 
 (use-package prism
   :defer

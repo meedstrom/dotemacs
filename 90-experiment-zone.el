@@ -68,6 +68,7 @@ Assumes there are no window dividers."
       (set-window-fringes (selected-window) (/ max-px 2) (/ max-px 2))))))
 
 
+
 (remove-hook 'window-size-change-functions #'pad-fringes-to-fill-column)
 (remove-hook 'window-buffer-change-functions #'pad-fringes-to-fill-column)
 
@@ -134,41 +135,41 @@ Assumes there are no window dividers."
       (require 'org-ref nil 'noerror)
       (require 'oc nil 'noerror)
       (org-roam-with-file file-path nil
-                          (org-with-wide-buffer (run-hooks 'my-org-roam-pre-scan-hook))
-                          (emacsql-with-transaction (org-roam-db)
-                            (org-with-wide-buffer
-                             ;; please comment why
-                             (org-set-regexps-and-options 'tags-only)
-                             ;; Maybe not necessary anymore
-                             ;; 2021 https://github.com/org-roam/org-roam/issues/1844
-                             ;; 2023 https://code.tecosaur.net/tec/org-mode/commit/5ed3e1dfc3e3bc6f88a4300a0bcb46d23cdb57fa
-                             (org-refresh-category-properties)
-                             (org-roam-db-clear-file)
-                             (org-roam-db-insert-file content-hash)
-                             (org-roam-db-insert-file-node)
-                             ;; please comment why
-                             (setq org-outline-path-cache nil)
-                             (goto-char (point-min))
-                             (let ((end (point-max)))
-                               (when (re-search-forward org-outline-regexp-bol nil t)
-                                 (while (progn
-                                          (when (org-roam-db-node-p)
-                                            (org-roam-db-insert-node-data)
-                                            (org-roam-db-insert-aliases)
-                                            (org-roam-db-insert-tags)
-                                            (org-roam-db-insert-refs))
-                                          (outline-next-heading)
-                                          (< (point) end)))))
-                             (setq org-outline-path-cache nil)
-                             (setq info (org-element-parse-buffer))
-                             (org-roam-db-map-links
-                              (list #'org-roam-db-insert-link))
-                             (when (featurep 'oc)
-                               (org-roam-db-map-citations
-                                info
-                                (list #'org-roam-db-insert-citation)))
-                             ))
-                          ))))
+        (org-with-wide-buffer (run-hooks 'my-org-roam-pre-scan-hook))
+        (emacsql-with-transaction (org-roam-db)
+          (org-with-wide-buffer
+           ;; please comment why
+           (org-set-regexps-and-options 'tags-only)
+           ;; Maybe not necessary anymore
+           ;; 2021 https://github.com/org-roam/org-roam/issues/1844
+           ;; 2023 https://code.tecosaur.net/tec/org-mode/commit/5ed3e1dfc3e3bc6f88a4300a0bcb46d23cdb57fa
+           (org-refresh-category-properties)
+           (org-roam-db-clear-file)
+           (org-roam-db-insert-file content-hash)
+           (org-roam-db-insert-file-node)
+           ;; please comment why
+           (setq org-outline-path-cache nil)
+           (goto-char (point-min))
+           (let ((end (point-max)))
+             (when (re-search-forward org-outline-regexp-bol nil t)
+               (while (progn
+                        (when (org-roam-db-node-p)
+                          (org-roam-db-insert-node-data)
+                          (org-roam-db-insert-aliases)
+                          (org-roam-db-insert-tags)
+                          (org-roam-db-insert-refs))
+                        (outline-next-heading)
+                        (< (point) end)))))
+           (setq org-outline-path-cache nil)
+           (setq info (org-element-parse-buffer))
+           (org-roam-db-map-links
+            (list #'org-roam-db-insert-link))
+           (when (featurep 'oc)
+             (org-roam-db-map-citations
+              info
+              (list #'org-roam-db-insert-citation)))
+           ))
+        ))))
 
 ;; Make the processing message more informative
 (defun my-org-roam-db-sync (&optional force)
@@ -193,8 +194,8 @@ If FORCE, force a rebuild of the cache from scratch."
     (emacsql-with-transaction (org-roam-db)
       ;; Bruh. Just load compat.
       (org-roam-dolist-with-progress (file (hash-table-keys current-files))
-                                     "Clearing removed files..."
-                                     (org-roam-db-clear-file file))
+          "Clearing removed files..."
+        (org-roam-db-clear-file file))
       ;; Unfortunately it's good for debugging to show which file you got
       ;; stuck on. So we can't use the message log combination feature with
       ;; the dolist with ...

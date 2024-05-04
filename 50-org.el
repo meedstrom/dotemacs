@@ -58,9 +58,17 @@
 
 (setopt org-node-format-candidate-fn
         (lambda (node title)
-          (if-let ((olp (org-node-olp node)))
+          (if-let ((olp (org-node-get-olp node)))
               (concat (string-join olp " > ") " > " title)
             title)))
+
+;; At some point (9.5?) the org-element cache started warning about
+;; unregistered buffer modifications, but that's part of how ws-butler does its
+;; work, so stop the warnings.
+(after! org-element
+  (advice-add 'org-element--cache-sync :before
+              (defun my-pretend-correct-buffer-size (&rest _)
+                (setq org-element--cache-last-buffer-size (buffer-size)))))
 
 (after! org-node
   ;; Make sure the extracted subtree inherits any CREATED property,

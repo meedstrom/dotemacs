@@ -55,11 +55,6 @@
 (after! dired
   (keymap-set dired-mode-map "q" #'kill-current-buffer))
 
-(after! ws-butler
-  ;; A nil setting jibes very badly with `auto-save-visited-mode'. PR:
-  ;; https://github.com/doomemacs/doomemacs/pull/7843
-  (setopt ws-butler-keep-whitespace-before-point t))
-
 (remove-hook 'dired-mode-hook #'dired-omit-mode) ;; Don't hide any files
 (remove-hook 'term-mode-hook #'hide-mode-line-mode)
 (remove-hook 'doom-first-buffer-hook #'global-hl-line-mode)
