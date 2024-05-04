@@ -14,8 +14,7 @@
 (setopt view-read-only t)
 (setopt indent-tabs-mode nil)
 (setopt debug-on-error t)
-(delq 'user-error debug-ignored-errors) ;; Also enter debugger for `user-error'
-(setopt vc-msg-newbie-friendly-msg nil)
+;; (delq 'user-error debug-ignored-errors) ;; Also enter debugger for `user-error'
 (setopt vc-msg-copy-id-to-kill-ring nil)
 (setopt shift-select-mode nil)
 (setopt mouse-drag-and-drop-region-cross-program t) ;; no effect on wayland?
@@ -44,7 +43,7 @@
           ("." . eww-browse-url)))
 
 ;; No limit on recentf
-;; I wonder if that slows it down?  (length recentf-list) is 2482
+;; I wonder if that slows it down?  (length recentf-list) is 2751 atm
 (after! recentf
   (setopt recentf-max-saved-items nil))
 
@@ -52,11 +51,11 @@
 
 ;;; Calendar...
 ;; Modern phones are our calendars now, but it's less aggravating to add and
-;; remove many events at once here.  (If only iOS or Android exposed a
-;; YAML/TOML file for system settings, that'd be another story.)  Emacs
-;; provides a neat solution: since org-agenda integrates holiday.el info, and
-;; the app Beorg can sync all agenda stuff into the iOS calendar, adding it
-;; here adds it there.  Magic.
+;; remove many events at once here.  (If only iOS or Android were user-friendly
+;; enough to expose a simple YAML/TOML file for all system and app settings,
+;; that'd be another story).  Emacs provides a neat solution: since org-agenda
+;; integrates holiday.el info, and the iOS app Beorg can sync all agenda stuff
+;; into the iOS calendar, adding it here adds it there.  Magic.
 
 (setopt holiday-bahai-holidays nil)
 (setopt holiday-hebrew-holidays nil)
@@ -87,7 +86,7 @@
           (holiday-fixed 3 8 "Clarence's birthday")
           (holiday-fixed 4 1 "Karin's birthday")
           (holiday-fixed 4 11 "Griselda's birthday")
-          (holiday-fixed 4 11 "Lena Duske's birthday")
+          (holiday-fixed 4 25 "Lena Duske's birthday")
           (holiday-fixed 6 18 "Rickard's birthday")
           (holiday-fixed 6 27 "Yang Yu Ting's birthday")
           (holiday-fixed 7 5 "Nath's birthday")

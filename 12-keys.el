@@ -76,6 +76,7 @@
 (keymap-set global-map "C-8" #'kill-whole-line)
 (keymap-set global-map "C-9" #'duplicate-dwim)
 (keymap-set global-map "C-;" #'embark-act) ;; like doom, but in all buffers
+(keymap-set global-map "C-x s" #'save-some-buffers)
 (keymap-set global-map "C-<next>" #'iflipb-next-buffer)
 (keymap-set global-map "C-<prior>" #'iflipb-previous-buffer)
 (keymap-set global-map "C-M-/" #'dabbrev-expand)

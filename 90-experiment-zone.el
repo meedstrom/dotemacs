@@ -1,5 +1,88 @@
 ;; Experiment zone -*- lexical-binding: t; -*-
 
+;; TODO: actually let's set window fringes, so that the whitespace in the centre blends together
+;; i.e. instead of fringes F-2F-F, let's have just F-F-F.
+(defun fringe-from-fill-column ()
+  "Return a cons cell where the `car' is the amount of windows
+you would be able to fit side-by-side in a frame as wide as
+`frame-width' while being sized to `fill-column', and the `cdr'
+is the max possible pixel value you can set for the fringe-width
+in this configuration.
+
+Assumes that you want the windows to fit 1 more character than
+the fill column i.e. for a `fill-column' of 80, that you want a
+window at least 81 chars wide.
+
+Assumes there are no window dividers."
+  (let* ((pixels-per-char (/ (frame-pixel-width) (frame-width)))
+         (needed-window-char-width (1+ (default-value 'fill-column)))
+         (needed-window-px-width (* needed-window-char-width pixels-per-char))
+         (n-windows-possible (/ (frame-pixel-width) needed-window-px-width))
+         (leftover-px (mod (frame-pixel-width) needed-window-px-width))
+         (leftover-px-per-window (/ leftover-px n-windows-possible)))
+    (cons n-windows-possible (/ leftover-px-per-window 2))))
+(set-fringe-mode (cdr (fringe-from-fill-column)))
+
+(defun window-leftover-px-after-satisfying-fill-column ()
+  (let* ((pixels-per-char (/ (window-pixel-width) (window-total-width)))
+         (window-minimum-px (* (1+ fill-column) pixels-per-char)))
+    (- (window-pixel-width) window-minimum-px)))
+
+(setq backtrace-on-redisplay-error t)
+
+;; (defvar pad-fringes-to-fill-column--state nil)
+;; aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+;; OK, I know what to do.  This function gonna run once for every live window,
+;; right?  Then first it checks if the window is already insufficient for
+;; fill-column, and minimizes the fringes if so.  Otherwise, it looks up the
+;; parent to check if it is a horizontal group.  If the width of that group
+;; matches the frame width, then it will try to do something that results in
+;; F-F-F arrangement. otherwise it falls back to the dumb method that would
+;; result in F-2F-F.  Don't really need code to cover that since it seems
+;; extremely hard to end up in that situation and those ppl can live with it.
+(defun pad-fringes-to-fill-column (&rest _)
+  (interactive)
+  (cond
+   ;; In horizontal group
+   ((window-combined-p (selected-window) t)
+    (let ((and-siblings (cddar (window--subtree (window-parent)))))
+      (if (>= fill-column (window-total-width))
+          ;; Fallback if the window is already insufficient for fill-column.
+          ;; Here we could do something clever like temporarily decrease
+          ;; the font size...  But that's a stretch goal if anything.
+          (dolist (win and-siblings)
+            (with-selected-window win
+              (set-window-fringes (selected-window) 0)
+              (unless window-divider-mode (window-divider-mode))))
+        (dolist (win and-siblings)
+          (with-selected-window win
+            (let ((max-px (window-leftover-px-after-satisfying-fill-column)))
+              (set-window-fringes (selected-window) (/ max-px 2) (/ max-px 2) t)
+              (when window-divider-mode (window-divider-mode 0))))))))
+   ;; Vertical group
+   ((window-combined-p (selected-window))
+    )
+   ;; No group; must be root window
+   ((frame-root-window-p (selected-window))
+    (let ((max-px (window-leftover-px-after-satisfying-fill-column)))
+      (set-window-fringes (selected-window) (/ max-px 2) (/ max-px 2))))))
+
+
+(remove-hook 'window-size-change-functions #'pad-fringes-to-fill-column)
+(remove-hook 'window-buffer-change-functions #'pad-fringes-to-fill-column)
+
+
+;; I used `auto-save-visited-mode' for years.  But many Emacs features are noisy
+;; on save, and now I'm tired of the noise.  We can configure the classic
+;; `auto-save-mode' to do for us largely what auto-save-visited-mode did:
+(setq save-all-timer (run-with-idle-timer 60 t #'save-some-buffers t))
+(setq auto-save-timeout 5)
+(add-hook 'find-file-hook
+          (defun my-auto-recover-this-file ()
+            (when (file-newer-than-file-p (or buffer-auto-save-file-name
+                                              (make-auto-save-file-name))
+                                          buffer-file-name)
+              (recover-file buffer-file-name))))
 
 
 (hookgen doom-after-init-hook
@@ -51,41 +134,41 @@
       (require 'org-ref nil 'noerror)
       (require 'oc nil 'noerror)
       (org-roam-with-file file-path nil
-        (org-with-wide-buffer (run-hooks 'my-org-roam-pre-scan-hook))
-        (emacsql-with-transaction (org-roam-db)
-          (org-with-wide-buffer
-           ;; please comment why
-           (org-set-regexps-and-options 'tags-only)
-           ;; Maybe not necessary anymore
-           ;; 2021 https://github.com/org-roam/org-roam/issues/1844
-           ;; 2023 https://code.tecosaur.net/tec/org-mode/commit/5ed3e1dfc3e3bc6f88a4300a0bcb46d23cdb57fa
-           (org-refresh-category-properties)
-           (org-roam-db-clear-file)
-           (org-roam-db-insert-file content-hash)
-           (org-roam-db-insert-file-node)
-           ;; please comment why
-           (setq org-outline-path-cache nil)
-           (goto-char (point-min))
-           (let ((end (point-max)))
-             (when (re-search-forward org-outline-regexp-bol nil t)
-               (while (progn
-                        (when (org-roam-db-node-p)
-                          (org-roam-db-insert-node-data)
-                          (org-roam-db-insert-aliases)
-                          (org-roam-db-insert-tags)
-                          (org-roam-db-insert-refs))
-                        (outline-next-heading)
-                        (< (point) end)))))
-           (setq org-outline-path-cache nil)
-           (setq info (org-element-parse-buffer))
-           (org-roam-db-map-links
-            (list #'org-roam-db-insert-link))
-           (when (featurep 'oc)
-             (org-roam-db-map-citations
-              info
-              (list #'org-roam-db-insert-citation)))
-           ))
-        ))))
+                          (org-with-wide-buffer (run-hooks 'my-org-roam-pre-scan-hook))
+                          (emacsql-with-transaction (org-roam-db)
+                            (org-with-wide-buffer
+                             ;; please comment why
+                             (org-set-regexps-and-options 'tags-only)
+                             ;; Maybe not necessary anymore
+                             ;; 2021 https://github.com/org-roam/org-roam/issues/1844
+                             ;; 2023 https://code.tecosaur.net/tec/org-mode/commit/5ed3e1dfc3e3bc6f88a4300a0bcb46d23cdb57fa
+                             (org-refresh-category-properties)
+                             (org-roam-db-clear-file)
+                             (org-roam-db-insert-file content-hash)
+                             (org-roam-db-insert-file-node)
+                             ;; please comment why
+                             (setq org-outline-path-cache nil)
+                             (goto-char (point-min))
+                             (let ((end (point-max)))
+                               (when (re-search-forward org-outline-regexp-bol nil t)
+                                 (while (progn
+                                          (when (org-roam-db-node-p)
+                                            (org-roam-db-insert-node-data)
+                                            (org-roam-db-insert-aliases)
+                                            (org-roam-db-insert-tags)
+                                            (org-roam-db-insert-refs))
+                                          (outline-next-heading)
+                                          (< (point) end)))))
+                             (setq org-outline-path-cache nil)
+                             (setq info (org-element-parse-buffer))
+                             (org-roam-db-map-links
+                              (list #'org-roam-db-insert-link))
+                             (when (featurep 'oc)
+                               (org-roam-db-map-citations
+                                info
+                                (list #'org-roam-db-insert-citation)))
+                             ))
+                          ))))
 
 ;; Make the processing message more informative
 (defun my-org-roam-db-sync (&optional force)
@@ -110,8 +193,8 @@ If FORCE, force a rebuild of the cache from scratch."
     (emacsql-with-transaction (org-roam-db)
       ;; Bruh. Just load compat.
       (org-roam-dolist-with-progress (file (hash-table-keys current-files))
-          "Clearing removed files..."
-        (org-roam-db-clear-file file))
+                                     "Clearing removed files..."
+                                     (org-roam-db-clear-file file))
       ;; Unfortunately it's good for debugging to show which file you got
       ;; stuck on. So we can't use the message log combination feature with
       ;; the dolist with ...

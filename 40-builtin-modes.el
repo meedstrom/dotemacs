@@ -1,7 +1,7 @@
 ;; -*- lexical-binding: t; -*-
 
 (save-place-mode)
-(auto-save-visited-mode) ;; NOTE see undoom.el
+;; (auto-save-visited-mode) ;; NOTE see undoom.el
 (display-battery-mode)
 
 (when (version<= "29" emacs-version)

@@ -39,7 +39,7 @@
 (fset 'doom-docs-org-mode #'ignore)
 (fset 'doom-docs--toggle-read-only-h #'ignore)
 
-;; i lost work !!!
+;; I lost work !!!  Why wouldn't it ask to save unsaved buffers?  Some Vim norm?
 (after! doom-keybinds
   (keymap-set doom-leader-map "q q" #'save-buffers-kill-emacs))
 
@@ -47,9 +47,7 @@
   (setopt eshell-input-filter #'eshell-input-filter-default)
   (setopt eshell-scroll-to-bottom-on-input nil)
   ;; Give me access to emacs --help
-  (fmakunbound #'eshell/emacs)
-  ;; I prefer it pick a recent buffer
-  (setopt +eshell-enable-new-shell-on-split nil))
+  (fmakunbound #'eshell/emacs))
 
 (after! esh-mode
   (keymap-set eshell-mode-map "C-l" #'recenter-top-bottom))
@@ -58,8 +56,8 @@
   (keymap-set dired-mode-map "q" #'kill-current-buffer))
 
 (after! ws-butler
-  ;; Having nil jibes badly with `auto-save-visited-mode'. Bug report:
-  ;; https://github.com/doomemacs/doomemacs/issues/7516
+  ;; A nil setting jibes very badly with `auto-save-visited-mode'. PR:
+  ;; https://github.com/doomemacs/doomemacs/pull/7843
   (setopt ws-butler-keep-whitespace-before-point t))
 
 (remove-hook 'dired-mode-hook #'dired-omit-mode) ;; Don't hide any files
@@ -87,15 +85,18 @@
 ;; screen gives them 2*87 or some such, not 2*80.
 ;;
 ;; So why don't I just set my frames to a multiple of at least 81?  My current
-;; hardware.  My monitor+font fits exactly 2x80, yay!  Fully optimized screen
+;; hardware.  My monitor+font fits exactly 2*80, yay!  Fully optimized screen
 ;; estate!  But it's a cursed windfall...  Shrinking the font one notch is not
 ;; an option since that would take it all the way down to 2x110 or so (wasn't
 ;; hiDPI supposed to give us more granular font sizes?).  I want the text as
 ;; big as will fit.
+;;
+;; BUG None of these settings work for my repos in
+;; doomemacs/.local/straight!  Only adding an .editorconfig does.
 (after! doom-editor
   (setq-default fill-column 79))
 (general-after-init
   (setq-default fill-column 79))
-;; why is something changing it
 (setq-default fill-column 79)
-(hookgen emacs-lisp-mode-hook (setq-default fill-column 79))
+(add-hook! '(emacs-lisp-mode-hook prog-mode-hook) :depth 99
+  (lambda () (setq fill-column 79)))

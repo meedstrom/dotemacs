@@ -18,6 +18,9 @@
   (setopt eshell-scroll-show-maximum-output nil) ;; ??
   (setopt eshell-scroll-to-bottom-on-output 'this)
 
+  ;; TODO I prefer it pick a recent buffer
+  ;; (setopt +eshell-enable-new-shell-on-split nil)
+
   ;; TODO: give the different parts of the string different text properties
   (setopt eshell-banner-message
           '(cl-loop
@@ -111,6 +114,7 @@
   ;; (define-key eshell-mode-map [remap eshell-next-prompt] #'my-esh-next-prompt)
   ;; (define-key eshell-mode-map [remap eshell-previous-prompt] #'my-esh-previous-prompt)
   )
+
 
 ;; Encourage idiomatic ways to work with Emacs
 ;; (after! eshell
