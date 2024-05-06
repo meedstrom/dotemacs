@@ -83,11 +83,11 @@
               ("<tab>" . 'copilot-accept-completion)
               ("C-<tab>" . 'copilot-accept-completion-by-word)))
 
-(use-package nameless
-  :hook (emacs-lisp-mode . nameless-mode)
-  :init
-  (setopt nameless-prefix "⁓")
-  (setopt nameless-private-prefix t)
-  (setopt nameless-affect-indentation-and-filling nil)
-  :config
-  (set-face-attribute 'nameless-face nil :inherit 'unspecified))
+;; (use-package nameless
+;;   :hook (emacs-lisp-mode . nameless-mode)
+;;   :init
+;;   (setopt nameless-prefix "⁓")
+;;   (setopt nameless-private-prefix t)
+;;   (setopt nameless-affect-indentation-and-filling nil)
+;;   :config
+;;   (set-face-attribute 'nameless-face nil :inherit 'unspecified))

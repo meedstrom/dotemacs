@@ -28,8 +28,6 @@ Assumes there are no window dividers."
          (window-minimum-px (* (1+ fill-column) pixels-per-char)))
     (- (window-pixel-width) window-minimum-px)))
 
-(setq backtrace-on-redisplay-error t)
-
 ;; (defvar pad-fringes-to-fill-column--state nil)
 ;; aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ;; OK, I know what to do.  This function gonna run once for every live window,
@@ -74,10 +72,13 @@ Assumes there are no window dividers."
 
 
 ;; I used `auto-save-visited-mode' for years.  But many Emacs features are noisy
-;; on save, and now I'm tired of the noise.  We can configure the classic
-;; `auto-save-mode' to do for us largely what auto-save-visited-mode did:
-(setq save-all-timer (run-with-idle-timer 60 t #'save-some-buffers t))
+;; on save, and I finally tired of the noise.  We can configure the classic
+;; `auto-save-mode' to grant us largely the same convenience:
 (setq auto-save-timeout 5)
+(setq auto-save-no-message t)
+(setq save-all-timer (run-with-idle-timer 40 t #'my-save-all))
+(add-function :after after-focus-change-function #'my-save-all)
+(add-hook 'magit-pre-refresh-hook #'my-save-all)
 (add-hook 'find-file-hook
           (defun my-auto-recover-this-file ()
             (when (file-newer-than-file-p (or buffer-auto-save-file-name

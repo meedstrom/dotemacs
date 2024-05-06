@@ -47,28 +47,23 @@
 (setopt org-tags-column 0)
 (setopt org-download-heading-lvl nil)
 (setopt org-download-image-dir "img/")
-(setopt org-node-creation-fn #'org-capture)
 
-(use-package org-node
-  :hook ((org-mode . org-node-backlink-mode)
-         (org-mode . org-node-cache-mode)))
+;; (use-package org-node
+;;   :hook ((org-mode . org-node-backlink-mode)
+;;          (org-mode . org-node-cache-mode)))
 
+(setq org-node-creation-fn #'org-capture)
 (setq org-node-perf-multicore t)
 (setq org-node-perf-assume-coding-system 'utf-8-unix)
+(setq org-node-extra-id-dirs
+      '("/home/kept/roam/"
+        "/home/me/.doom.d/"))
 
 (setopt org-node-format-candidate-fn
         (lambda (node title)
           (if-let ((olp (org-node-get-olp node)))
               (concat (string-join olp " > ") " > " title)
             title)))
-
-;; At some point (9.5?) the org-element cache started warning about
-;; unregistered buffer modifications, but that's part of how ws-butler does its
-;; work, so stop the warnings.
-(after! org-element
-  (advice-add 'org-element--cache-sync :before
-              (defun my-pretend-correct-buffer-size (&rest _)
-                (setq org-element--cache-last-buffer-size (buffer-size)))))
 
 (after! org-node
   ;; Make sure the extracted subtree inherits any CREATED property,
@@ -163,18 +158,7 @@
   (unless after-init-time
     (setq debug-on-error t)
     (error (message "Org loaded during init, I don't want this")))
-  ;; Regenerate org-id-locations if it's gone
-  (require 'org-id)
-  (unless (and (file-exists-p org-id-locations-file)
-               (org-id-locations-load)
-               (not (hash-table-empty-p org-id-locations)))
-    (org-id-update-id-locations
-     (--filter (and (not (string-search "/logseq/bak/" it))
-                    (not (string-search "/logseq/version-files/" it)))
-               (--mapcat (directory-files-recursively it "\\.org$")
-                         '("/home/kept/roam/"
-                           "/home/kept/archive/"
-                           "/home/me/.doom.d/")))))
+
 
   (require 'named-timer)
   (named-timer-run :my-clock-reminder nil 600

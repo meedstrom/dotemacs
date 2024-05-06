@@ -15,6 +15,7 @@
 (setopt indent-tabs-mode nil)
 (setopt debug-on-error t)
 ;; (delq 'user-error debug-ignored-errors) ;; Also enter debugger for `user-error'
+(setopt backtrace-on-redisplay-error nil)
 (setopt vc-msg-copy-id-to-kill-ring nil)
 (setopt shift-select-mode nil)
 (setopt mouse-drag-and-drop-region-cross-program t) ;; no effect on wayland?
@@ -23,7 +24,6 @@
 (setopt proced-enable-color-flag t)
 (setopt abbrev-suggest t)
 (setopt use-short-answers t)
-(setopt backtrace-on-redisplay-error nil)
 (setq byte-compile-warnings '(not free-vars))
 (setopt eval-expression-print-length 64)
 (setopt eval-expression-print-level 16)
