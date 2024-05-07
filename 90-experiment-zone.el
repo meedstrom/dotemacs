@@ -79,13 +79,14 @@ Assumes there are no window dividers."
 (setq save-all-timer (run-with-idle-timer 40 t #'my-save-all))
 (add-function :after after-focus-change-function #'my-save-all)
 (add-hook 'magit-pre-refresh-hook #'my-save-all)
-(add-hook 'find-file-hook
-          (defun my-auto-recover-this-file ()
-            (when (file-newer-than-file-p (or buffer-auto-save-file-name
-                                              (make-auto-save-file-name))
-                                          buffer-file-name)
-              (recover-file buffer-file-name))))
-
+(advice-add 'after-find-file :before
+            (defun my-auto-recover-this-file (&optional _ _ _ after-revert _)
+              (unless after-revert
+                (when (file-newer-than-file-p (or buffer-auto-save-file-name
+                                                  (make-auto-save-file-name))
+                                              buffer-file-name)
+                  ;; Gotta patch this kludge so it can recover without prompt
+                  (recover-file buffer-file-name)))))
 
 (hookgen doom-after-init-hook
   (setq my-stim-collection (my-stim-collection-generate)))

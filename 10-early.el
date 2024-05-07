@@ -1,6 +1,7 @@
 ;; -*- lexical-binding: t; -*-
 
 (add-load-path! "/home/kept/emacs/key-seqs-finder/"
+                "/home/kept/emacs/lintorg/"
                 "/home/kept/emacs/twee-mode/")
 
 

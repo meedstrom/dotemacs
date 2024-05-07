@@ -48,13 +48,16 @@
 (setopt org-download-heading-lvl nil)
 (setopt org-download-image-dir "img/")
 
-;; (use-package org-node
-;;   :hook ((org-mode . org-node-backlink-mode)
-;;          (org-mode . org-node-cache-mode)))
+;; bug
+(setopt org-clock-kill-emacs-query nil)
+
+(use-package org-node
+  :hook ((org-mode . org-node-backlink-mode)
+         (org-mode . org-node-cache-mode)))
 
 (setq org-node-creation-fn #'org-capture)
-(setq org-node-perf-multicore t)
-(setq org-node-perf-assume-coding-system 'utf-8-unix)
+
+
 (setq org-node-extra-id-dirs
       '("/home/kept/roam/"
         "/home/me/.doom.d/"))
@@ -200,4 +203,4 @@
 
 ;;; Workaround the tide of org-element parser bugs since 9.5 rewrite
 
-;; (setq org-element-use-cache nil)
+(setq org-element-use-cache nil)

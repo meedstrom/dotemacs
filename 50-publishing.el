@@ -3,6 +3,7 @@
 
 (defvar my-tags-to-avoid-uploading '("noexport" "archive" "private" "censor"))
 (defvar my-tags-for-hiding '("gri" "shrink" "privy" "lover" "fren"))
+(defvar my-tags-for-publishing (cons "pub" my-tags-for-hiding))
 
 ;; TODO: Upstream
 ;; Override the info: link type so it won't get exported into an empty <a href>
@@ -41,6 +42,7 @@ scanned."
   (require 'prism)
   (require 'dash)
   (require 'kv)
+  (require 'lintorg)
   (view-echo-area-messages) ;; for watching it work
   (setq org-export-use-babel nil)
   (setq org-export-with-broken-links nil) ;; links would disappear quietly!
@@ -98,24 +100,30 @@ scanned."
                                  winner-mode
                                  ws-butler-global-mode))
 
-  ;; (require 'lintorg)
-  ;; (setq lintorg-buffer-hook '(lintorg-buffer/check-link-brackets
-  ;;                             lintorg-buffer/check-link-types
-  ;;                             lintorg-buffer/assert-uuid-ids
-  ;;                             lintorg-buffer/seek-broken-syntax
-  ;;                             lintorg-buffer/seek-broken-tags))
-  ;; (setq lintorg-subtree-hook '(lintorg-subtree/seek-broken-tags
-  ;;                              lintorg-assert-lowercase-tags
-  ;;                              lintorg-assert-roam-refs-all-unquoted
-  ;;                              lintorg-assert-created
-  ;;                              lintorg-assert-created-is-proper-timestamp))
-  ;; (add-hook 'lintorg-front-matter-hook
-  ;;           (defun my-ensure-publishability-info ()
-  ;;             (unless (-intersection (org-get-tags)
-  ;;                                    (append '("pub")
-  ;;                                            my-tags-for-hiding
-  ;;                                            my-tags-to-avoid-uploading))
-  ;;               (lintorg-warn "No tag that indicates publishability"))))
+  (setq lintorg-on-front-matter-hook
+        '(lintorg-local-entry/assert-id
+          lintorg-local-entry/assert-created-if-id
+          lintorg-local-entry/assert-created-is-proper-timestamp
+          lintorg-local-entry/assert-roam-refs-have-no-quotes
+          lintorg-front-matter/assert-title
+          lintorg-front-matter/assert-tags-are-lowercase
+          lintorg-front-matter/seek-broken-filetags
+          ))
+  (setq lintorg-across-buffer-hook
+        '(lintorg-region/seek-wrong-link-brackets
+          lintorg-region/assert-org-ids-are-uuid
+          lintorg-region/assert-structures-needing-own-line-are-on-own-line
+          lintorg-region/assert-only-permitted-link-types
+          ))
+  (setq lintorg-on-subtree-hook
+        '(lintorg-subtree/seek-broken-heading-tags
+          lintorg-subtree/assert-tags-are-lowercase
+          lintorg-local-entry/assert-created-if-id
+          lintorg-local-entry/assert-created-is-proper-timestamp
+          lintorg-local-entry/assert-alphabetized-properties
+          lintorg-local-entry/assert-roam-refs-have-no-quotes
+          lintorg-subtree/seek-broken-heading-tags
+          ))
 
   ;; For hygiene, ensure that this subordinate emacs syncs nothing to disk
   (eager-state-preempt-kill-emacs-hook-mode 0)
@@ -160,7 +168,7 @@ scanned."
     (shell-command "rm /tmp/roam/org-roam.db"))
   (when (equal current-prefix-arg '(16))
     (shell-command "rm /tmp/roam/org-roam.db")
-    (add-hook 'my-org-roam-pre-scan-hook #'my-validate-org-buffer))
+    (add-hook 'my-org-roam-pre-scan-hook #'lintorg-lint))
 
   ;; Tell `org-id-locations' and the org-roam DB about the new work directory
   (setq org-roam-directory "/tmp/roam/org/")
@@ -175,7 +183,7 @@ scanned."
   ;; Reset the work output
   (shell-command "rm -rf /tmp/roam/{html,json,atom}/")
   (shell-command "mkdir -p /tmp/roam/{html,json,atom}")
-  (setq my-ids (clrhash my-ids))
+  (clrhash my-ids)
 
   ;; Change some things about the Org files, before org-export does its thing.
   (add-hook 'org-export-before-parsing-functions #'my-add-backlinks 10)
@@ -217,7 +225,7 @@ Then postprocess that same html into json and atom files.
 Designed to be called by `org-publish'.  All arguments pass
 through to `org-html-publish-to-html'."
   (redisplay) ;; Let me watch it work
-  (if (-intersection (my-org-file-tags filename) my-tags-to-avoid-uploading)
+  (if (not (-intersection (my-org-file-tags filename) my-tags-for-publishing))
       ;; If we already know we won't publish it, don't export the file at all.
       ;; Saves so much time.  Some other issues can also disqualify the file,
       ;; but I take care of them in `my-validate-org-buffer'.

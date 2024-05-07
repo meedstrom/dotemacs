@@ -29,5 +29,6 @@
        tree-sitter
        editorconfig
        lsp
-       (magit +forge)
+       (magit)
+       ;; (magit +forge)
        pdf)
