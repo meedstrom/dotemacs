@@ -64,9 +64,23 @@
 
 (setopt org-node-format-candidate-fn
         (lambda (node title)
-          (if-let ((olp (org-node-get-olp node)))
-              (concat (string-join olp " > ") " > " title)
+          (if (org-node-get-is-subtree node)
+              (let ((ancestors (cons (org-node-get-file-title-or-basename node)
+                                     (org-node-get-olp node)))
+                    (result nil))
+                (dolist (anc ancestors)
+                  (push (propertize anc 'face 'shadow) result)
+                  (push " > " result))
+                (push title result)
+                (string-join (nreverse result)))
             title)))
+
+;; (concat (string-join (--map (propertize it 'face 'shadow)
+;;                                             ancestors)
+;;                                      " > ")
+;;                         " > "
+;;                         title)
+
 
 (after! org-node
   ;; Make sure the extracted subtree inherits any CREATED property,

@@ -4,7 +4,7 @@
        :emacs dired
        :term shell
        :checkers spell
-       :app irc
+       ;; :app irc
        :email mu4e
        :config (default +bindings +smartparens)
 

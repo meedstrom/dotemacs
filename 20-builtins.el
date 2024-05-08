@@ -14,8 +14,9 @@
 (setopt view-read-only t)
 (setopt indent-tabs-mode nil)
 (setopt debug-on-error t)
+;; (setopt debug-on-signal t)
 ;; (delq 'user-error debug-ignored-errors) ;; Also enter debugger for `user-error'
-(setopt backtrace-on-redisplay-error nil)
+;; (setopt backtrace-on-redisplay-error t)
 (setopt vc-msg-copy-id-to-kill-ring nil)
 (setopt shift-select-mode nil)
 (setopt mouse-drag-and-drop-region-cross-program t) ;; no effect on wayland?

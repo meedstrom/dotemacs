@@ -3,6 +3,7 @@
 ;; Need during init
 (package! named-timer)
 (package! l) ;; fn literal so i can write (l'rainbow-mode 0)
+(package! llama)
 (package! defrepeater)
 (package! el-patch)
 (package! compat)
