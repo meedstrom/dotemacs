@@ -1,5 +1,64 @@
 ;; Experiment zone -*- lexical-binding: t; -*-
 
+(cl-sort
+ (list
+  (cons (prog1 'catch+dolist (garbage-collect))
+        (car
+         (benchmark-run-compiled 1000000
+           (let ((list-of-unknown-length '(1 3 5 6 8 10)))
+             (while (cl-oddp (pop list-of-unknown-length)))))))
+  (cons (prog1 'cl-loop (garbage-collect))
+        (car
+         (benchmark-run-compiled 1000000
+           (cl-loop with list-of-unknown-length = '(1 3 5 6 8 10)
+                    until (cl-evenp (pop list-of-unknown-length)))))))
+ (function <) :key (function cdr))
+
+
+(td :from (:file-read "some-file")
+    :trans (:map (cons it 0))
+    :reduce (:fold #'max))
+
+
+(td (:file-read "some-file")
+    (:map ((it) (cons it 0))
+     :conc t)
+    (:fold #'max))
+
+(td (:file-read "some-file") (:map ((it) (cons it 0)) :conc) (:fold #'max))
+
+
+(defun cl--position (item seq start &optional end from-end)
+  (if (listp seq)
+      (let ((remainder (-drop start seq))
+            res)
+        (while (and remainder
+                    (or (null end) (< start end))
+                    (or (null res) from-end))
+          (if (cl--check-test item (car remainder))
+              (setq res start))
+          (setq remainder (cdr remainder))
+          (setq start (1+ start)))
+        res)
+    (or end (setq end (length seq)))
+    (if from-end
+        (progn
+          (while (and (>= (setq end (1- end)) start)
+                      (not (cl--check-test item (aref seq end)))))
+          (and (>= end start) end))
+      (while (and (< start end)
+                  (not (cl--check-test item (aref seq start))))
+        (setq start (1+ start)))
+      (and (< start end) start))))
+
+(defmacro cl--check-test-nokey (item x) ;cl-test cl-if cl-test-not cl-if-not.
+  (declare (debug edebug-forms))
+  `(cond
+    (cl-test (eq (not (funcall cl-test ,item ,x))
+                 cl-test-not))
+    (cl-if (eq (not (funcall cl-if ,x)) cl-if-not))
+    (t (equal ,item ,x))))
+
 ;; TODO: actually let's set window fringes, so that the whitespace in the centre blends together
 ;; i.e. instead of fringes F-2F-F, let's have just F-F-F.
 (defun fringe-from-fill-column ()
@@ -30,7 +89,7 @@ Assumes there are no window dividers."
 
 ;; (defvar pad-fringes-to-fill-column--state nil)
 ;; aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-;; OK, I know what to do.  This function gonna run once for every live window,
+;; OK, I know what to do.  This function gonna run mutually-recursed-once for every live window,
 ;; right?  Then first it checks if the window is already insufficient for
 ;; fill-column, and minimizes the fringes if so.  Otherwise, it looks up the
 ;; parent to check if it is a horizontal group.  If the width of that group
@@ -79,14 +138,23 @@ Assumes there are no window dividers."
 (setq save-all-timer (run-with-idle-timer 40 t #'my-save-all))
 (add-function :after after-focus-change-function #'my-save-all)
 (add-hook 'magit-pre-refresh-hook #'my-save-all)
-(advice-add 'after-find-file :before
-            (defun my-auto-recover-this-file (&optional _ _ _ after-revert _)
-              (unless after-revert
-                (when (file-newer-than-file-p (or buffer-auto-save-file-name
-                                                  (make-auto-save-file-name))
-                                              buffer-file-name)
-                  ;; Gotta patch this kludge so it can recover without prompt
-                  (recover-file buffer-file-name)))))
+
+
+(advice-add 'after-find-file :before #'my-auto-recover-this-file)
+
+(let (mutually-recursed-once)
+  (defun my-auto-recover-this-file (&optional _ _ _ after-revert _)
+    (unless (or mutually-recursed-once after-revert)
+      (when (file-newer-than-file-p (or buffer-auto-save-file-name
+                                        (make-auto-save-file-name))
+                                    buffer-file-name)
+        ;; 1. Gotta patch this function so it can skip the prompt
+        ;; 2. Also, it calls `after-find-file' itself, thus we need the
+        ;;    `mutually-recursed-once' check.
+        (setq mutually-recursed-once t)
+        (unwind-protect
+            (recover-file buffer-file-name)
+          (setq mutually-recursed-once nil))))))
 
 (hookgen doom-after-init-hook
   (setq my-stim-collection (my-stim-collection-generate)))

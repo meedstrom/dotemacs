@@ -154,7 +154,7 @@
                            ("+" (:strike-through t))))
 
 (add-hook 'org-noter-notes-mode-hook #'abbrev-mode)
-(add-hook 'org-noter-notes-mode-hook (l'rainbow-delimiters-mode 0))
+(add-hook 'org-noter-notes-mode-hook (lambda () rainbow-delimiters-mode 0))
 (add-hook 'org-mode-hook #'my-org-setup-prettify)
 ;; (add-hook 'org-mode-hook #'org-resolve-clocks 95)
 ;; (add-hook 'org-mode-hook #'org-clock-persistence-insinuate)

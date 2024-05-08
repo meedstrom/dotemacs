@@ -2,8 +2,8 @@
 
 ;; Need during init
 (package! named-timer)
-(package! l) ;; fn literal so i can write (l'rainbow-mode 0)
-(package! llama)
+;; (package! l) ;; fn literal so i can write (l'rainbow-mode 0)
+;; (package! llama)
 (package! defrepeater)
 (package! el-patch)
 (package! compat)
@@ -47,6 +47,7 @@
 (package! consult-ffdata :recipe (:host github :repo "chen-chao/consult-ffdata"))
 (package! math-delimiters :recipe (:host github :repo "oantolin/math-delimiters"))
 (package! copy-as-format)
+(package! ctrlf)
 (package! corfu)
 (package! crux)
 (package! cycle-buffer) ;; last updated 1997, but more useful commands than iflipb
