@@ -71,6 +71,12 @@
 ;; for embark
 (setopt y-or-n-p-use-read-key t)
 
+;; ;; The completing-read prompter is not good by itself since you must type every
+;; ;; time, but by hitting ' you can then hit a hotkey without typing
+;; ;; But to be fair... it's not clear why completing read should ever be involved
+;; (setopt embark-prompter #'embark-completing-read-prompter)
+;; (setopt embark-keymap-prompter-key "'")
+
 ;; (setopt consult-line-start-from-top t)
 
 ;; "Drop obsolete =consult-multi-occur=. Alternative: Built-in =multi-occur=,

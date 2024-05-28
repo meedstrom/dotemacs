@@ -53,15 +53,24 @@ scanned."
   ;; TODO: upstream as an option for `org-html-with-latex'. this is very fast
   (setq org-latex-to-html-convert-command "node ~/.doom.d/texToMathML.js %i")
   (setq save-silently t)
-  (setq org-inhibit-startup t) ;; from org-publish-org-to
   (setq debug-on-error t)
+  (setq-default tab-width 8)
   (my-remove-all-advice 'org-roam-db-update-file) ;; disable my hacks
+  ;; ignore backlinks
+  (setq org-roam-db-extra-links-exclude-keys
+        '((node-property "ROAM_REFS" "BACKLINKS")
+          (keyword "transclude")))
 
   ;; Speed up publishing
   (gcmh-mode 0)
   (setq gc-cons-threshold (* 5 1000 1000 1000))
   (setq org-mode-hook nil)
   (fset 'org-publish-write-cache-file #'ignore) ;; mega speedup!
+  (setq file-name-handler-alist nil)
+  (setq coding-system-for-read 'utf-8-unix)
+  (setq coding-system-for-write 'utf-8-unix)
+  (setq org-inhibit-startup t) ;; from org-publish-org-to
+  ;; (setq find-file-hook nil)
 
   ;; Attempt to speed up publishing, not sure these help much
   (advice-remove 'after-find-file #'doom--shut-up-autosave-a)
@@ -120,7 +129,6 @@ scanned."
           lintorg-subtree/assert-tags-are-lowercase
           lintorg-local-entry/assert-created-if-id
           lintorg-local-entry/assert-created-is-proper-timestamp
-          lintorg-local-entry/assert-alphabetized-properties
           lintorg-local-entry/assert-roam-refs-have-no-quotes
           lintorg-subtree/seek-broken-heading-tags
           ))
@@ -149,8 +157,8 @@ scanned."
   (let ((org-agenda-files '("/tmp/roam/org/noagenda/archive.org")))
     (my-generate-todo-log "/tmp/roam/org/todo-log.org"))
 
-  ;; Ensure that each post URL will contain a unique ID by now placing them in
-  ;; subdirectories named by that ID, so org-export will translate all
+  ;; Ensure that each post URL will contain a unique page ID by now placing
+  ;; them in subdirectories named by that ID, so org-export will translate all
   ;; org-id links into these relative filesystem paths.
   (cl-loop for path in (directory-files-recursively "/tmp/roam/org/" "\\.org$")
            do (if (and (not (string-search ".sync-conflict-" path))
@@ -164,6 +172,7 @@ scanned."
                 (delete-file path)))
 
   ;; Handle C-u
+  (remove-hook 'my-org-roam-pre-scan-hook #'lintorg-lint)
   (when (equal current-prefix-arg '(4))
     (shell-command "rm /tmp/roam/org-roam.db"))
   (when (equal current-prefix-arg '(16))
@@ -225,7 +234,8 @@ Then postprocess that same html into json and atom files.
 Designed to be called by `org-publish'.  All arguments pass
 through to `org-html-publish-to-html'."
   (redisplay) ;; Let me watch it work
-  (if (not (-intersection (my-org-file-tags filename) my-tags-for-publishing))
+  (if (or (not (-intersection (my-org-file-tags filename) my-tags-for-publishing))
+          (-intersection (my-org-file-tags filename) my-tags-to-avoid-uploading))
       ;; If we already know we won't publish it, don't export the file at all.
       ;; Saves so much time.  Some other issues can also disqualify the file,
       ;; but I take care of them in `my-validate-org-buffer'.
@@ -438,7 +448,7 @@ through to `org-html-publish-to-html'."
       (cl-loop for img in (dom-by-tag dom 'img)
                as path = (dom-attr img 'src)
                as alt = (dom-attr img 'alt)
-               when (string-prefix-p "attach" path)
+               when (string-prefix-p "img" path)
                ;; Fix paths
                do (dom-set-attribute img 'src (concat "/" path))
                ;; Org exports an image alt-text that is just the image

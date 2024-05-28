@@ -55,8 +55,8 @@
   :hook ((org-mode . org-node-backlink-mode)
          (org-mode . org-node-cache-mode)))
 
+;; (setq org-node-creation-fn #'org-node-new-by-roam-capture)
 (setq org-node-creation-fn #'org-capture)
-
 
 (setq org-node-extra-id-dirs
       '("/home/kept/roam/"

@@ -4,29 +4,29 @@
   "Quickly get the file-level id from FILE.
 For use in heavy loops; it skips activating `org-mode'.
 For all other uses, see `org-id-get'."
-  (with-temp-buffer
-    (insert-file-contents-literally file nil 0 200)
-    (when (search-forward ":id: " nil t)
-      (when (= (line-number-at-pos) (line-number-at-pos (point-max)))
-        (error "Whoops, amend `my-org-file-id'"))
-      (delete-horizontal-space)
-      (buffer-substring (point) (line-end-position)))))
+  (let ((file-name-handler-alist nil))
+    (with-temp-buffer
+      (insert-file-contents-literally file nil 0 200)
+      (when (search-forward ":id: " nil t)
+        (when (= (line-number-at-pos) (line-number-at-pos (point-max)))
+          (error "Whoops, amend `my-org-file-id'"))
+        (delete-horizontal-space)
+        (buffer-substring (point) (line-end-position))))))
 
 (defun my-org-file-tags (file)
   "Quickly get the file-tags from FILE.
 For use in heavy loops; it skips activating `org-mode'.
 For all other uses, see `org-get-tags'."
-  (with-temp-buffer
-    (insert-file-contents file nil 0 400)
-    (let ((boundary (or (save-excursion (re-search-forward "^ *?[^#:]" nil t))
-                        (point-max))))
-      (when (search-forward "#+filetags: " boundary t)
-        (when (= (line-number-at-pos) (line-number-at-pos (point-max)))
-          (error "Whoops, amend `my-org-file-tags'"))
-        (thread-first (buffer-substring (point) (line-end-position))
-                      (string-trim)
-                      (string-split ":" t)
-                      (sort #'string-lessp))))))
+  (let ((file-name-handler-alist nil))
+    (with-temp-buffer
+      (insert-file-contents file)
+      (let ((boundary (or (save-excursion (re-search-forward "^ *?[^#:]" nil t))
+                          (point-max))))
+        (when (search-forward "#+filetags: " boundary t)
+          (thread-first (buffer-substring (point) (line-end-position))
+                        (string-trim)
+                        (string-split ":" t)
+                        (sort #'string-lessp)))))))
 
 (defun my-uuid-to-short (uuid)
   (let* ((hexa (string-trim (string-replace "-" "" uuid)))
@@ -161,7 +161,7 @@ Useful for jumping past a file's front matter.")
                  (while (progn
                           (forward-line 1)
                           (or (looking-at-p "^[ \t]*:") (eobp))))
-                 (insert "\nGoing off " refs "\n\n"))
+                 (insert "\n(" refs ")\n\n"))
                (outline-next-heading)
                (not (eobp)))))))
 

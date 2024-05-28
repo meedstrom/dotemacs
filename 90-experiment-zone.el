@@ -16,6 +16,7 @@
 
 
 
+
 ;; (seq-do (lambda (file) (delete-file file)) (directory-files "/"))
 ;; (seq-do ((file) (delete-file file)) (directory-files "/"))
 

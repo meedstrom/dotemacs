@@ -124,7 +124,8 @@
 (package! org-roam)
 (package! org-download)
 (package! htmlize)
-(package! delve :recipe (:host github :repo "publicimageltd/delve"))
+(package! org-gamify :recipe (:host bitbucket :repo "eeeickythump/org-gamify"))
+(package! gamify-el :recipe (:host github :repo "Idorobots/gamify-el"))
 ;; (package! org-recent-headings)
 ;; (package! org-roam-bibtex) ;; yes still relevant for org 9.5
 (package! org-roam-ui)
