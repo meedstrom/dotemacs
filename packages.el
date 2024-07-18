@@ -1,5 +1,49 @@
 ;; -*- no-byte-compile: t; -*-
 
+;; TODO Infer :host gitlab as well as :host nil
+(defmacro pkg (url &rest keywords)
+  "Expand into `package!' with pre-filled arguments.
+
+If you were not going to specify any keywords, you can just use
+`package!', but otherwise this macro has a simpler calling
+convention and lets you skip boilerplate.
+
+First argument URL expands into the boilerplate
+\"package-name :recipe (:host github :repo \"partial-url\")\".
+
+KEYWORDS can be any of :name, :type, :files, :depth, :branch.
+
+- See documentation for most of those at
+  https://github.com/radian-software/straight.el
+- The keyword :type comes from Doom's `package!'
+- The keyword :name is unique to this macro, for setting a
+  package name that differs from the GitHub repo name
+
+This macro does not implicitly quote any arguments."
+  (let* ((type (plist-get keywords :type))
+         (files (plist-get keywords :files))
+         (depth (plist-get keywords :depth))
+         (branch (plist-get keywords :branch)))
+    `(package! ,(or (plist-get keywords :name)
+                    (intern (replace-regexp-in-string
+                             "^.*?github.com/.*?/" "" url)))
+       ;; ,@(if (plist-get keywords :type) (list :type (plist-get keywords :type)))
+       ,@(if type (list :type type))
+       :recipe (:host github
+                :repo ,(replace-regexp-in-string "^.*?github.com/" "" url)
+                ;; Don't implicitly quote args (confusing)
+                ,@(if branch (list :branch (doom-unquote branch)))
+                ,@(if depth (list :depth (doom-unquote depth)))
+                ,@(if files (list :files (doom-unquote files)))))))
+
+;; ;; Macroexpand this
+;; (package "https://github.com/minad/org-modern")
+;; (pkg "https://github.com/minad/org-modern" :files '("*.texi") :type 'local)
+
+;; ;; Testing
+;; (package! org-modern :recipe (:host github :repo "minad/org-modern"))
+(pkg "https://github.com/minad/org-modern")
+
 ;; Need during init
 (package! named-timer)
 ;; (package! l) ;; fn literal so i can write (l'rainbow-mode 0)
@@ -10,15 +54,14 @@
 (package! dash)
 
 ;; My own packages
-(package! asyncloop :type 'local :recipe (:host github :repo "meedstrom/asyncloop" :depth full))
-(package! massmapper :type 'local :recipe (:host github :repo "meedstrom/massmapper" :depth full))
-(package! deianira :type 'local :recipe (:host github :repo "meedstrom/deianira" :depth full))
+(package! asyncloop   :type 'local :recipe (:host github :repo "meedstrom/asyncloop" :depth full))
+(package! massmapper  :type 'local :recipe (:host github :repo "meedstrom/massmapper" :depth full))
+(package! deianira    :type 'local :recipe (:host github :repo "meedstrom/deianira" :depth full))
 (package! eager-state :type 'local :recipe (:host github :repo "meedstrom/eager-state" :depth full))
-(package! quickroam :type 'local :recipe (:host github :repo "meedstrom/quickroam" :depth full))
-;; (package! lintorg :type 'local :recipe (:host github :repo "meedstrom/lintorg" :depth full))
+(package! quickroam   :type 'local :recipe (:host github :repo "meedstrom/quickroam" :depth full))
 (package! inline-anki :type 'local :recipe (:host github :repo "meedstrom/inline-anki" :depth full))
-(package! org-node :type 'local :recipe (:host github :repo "meedstrom/org-node" :depth full))
-(package! eva :type 'local :recipe (:host github :repo "meedstrom/eva" :depth full :files (:defaults "assets" "renv" "*.R" "*.gnuplot")))
+(package! org-node    :type 'local :recipe (:host github :repo "meedstrom/org-node" :depth full))
+(package! eva         :type 'local :recipe (:host github :repo "meedstrom/eva" :depth full :files (:defaults "assets" "renv" "*.R" "*.gnuplot")))
 
 ;; Disable Doom-installed stuff
 (package! org-crypt :disable t) ;; slowwww
@@ -26,47 +69,55 @@
 (package! which-key :disable t) ;; slowwww
 (package! doom-snippets :disable t) ;; doom's yasnippets
 
+(pkg "https://github.com/minad/org-modern")
+(pkg "https://github.com/chen-chao/consult-ffdata")
+(pkg "https://github.com/oantolin/math-delimiters")
+(pkg "https://github.com/toshism/org-super-links")
+(pkg "https://github.com/rtrppl/orgrr")
+(pkg "https://github.com/SebastienWae/app-launcher")
+(pkg "https://github.com/karthink/dired-hist")
+(pkg "https://github.com/chainsawriot/ess-rproj")
+(pkg "https://github.com/kickingvegas/casual-avy")
+(pkg "https://github.com/kickingvegas/casual-dired")
+(pkg "https://github.com/kickingvegas/casual")
+(pkg "https://github.com/tangxinfa/firefox-bookmarks")
+(pkg "https://github.com/kmonad/kbd-mode")
+(pkg "https://github.com/manateelazycat/awesome-tray")
+(pkg "https://github.com/Idorobots/gamify-el")
+
+
 ;; The rest
-(package! org-super-links :recipe (:host github :repo "toshism/org-super-links"))
-(package! orgrr :recipe (:host github :repo "rtrppl/orgrr"))
 (package! academic-phrases)
 (package! apheleia)
-(package! app-launcher :recipe (:host github :repo "SebastienWae/app-launcher"))
 (package! artbollocks-mode)
 (package! backup-walker)
 (package! beginend)
 (package! kv)
 (package! bm)
-(package! chatgpt-shell)
+;; (package! chatgpt-shell)
 (package! bui)
 (package! buttercup)
 (package! calibredb)
 (package! cape)
 (package! circadian)
 (package! consult)
-(package! consult-ffdata :recipe (:host github :repo "chen-chao/consult-ffdata"))
-(package! math-delimiters :recipe (:host github :repo "oantolin/math-delimiters"))
 (package! copy-as-format)
 (package! ctrlf)
 (package! corfu)
 (package! crux)
 (package! cycle-buffer) ;; last updated 1997, but more useful commands than iflipb
-(package! define-repeat-map :recipe (:host nil :repo "https://tildegit.org/acdw/define-repeat-map.el"))
 (package! director)
 (package! dired-git-info)
 (package! dired-hacks)
-(package! dired-hist :recipe (:host github :repo "karthink/dired-hist"))
 (package! disable-mouse)
 (package! disk-usage)
 (package! dmenu)
 (package! doom-themes)
 (package! elisp-format)
 (package! elisp-autofmt)
-(package! emacs-piper :recipe (:host gitlab :repo "howardabrams/emacs-piper"))
 (package! embark)
-(package! ess-rproj :recipe (:host github :repo "chainsawriot/ess-rproj"))
+(package! transducers)
 (package! esup)
-(package! firefox-bookmarks :recipe (:host github :repo "tangxinfa/firefox-bookmarks"))
 (package! flycheck-package)
 (package! form-feed)
 (package! gif-screencast)
@@ -84,9 +135,9 @@
 (package! iedit)
 (package! iflipb) ;; vs cycle-buffer?
 (package! iscroll)
-(package! kbd-mode :recipe (:host github :repo "kmonad/kbd-mode"))
 (package! keymap-utils) ;; prefix kmu-*
 (package! mastodon)
+(package! org-ql)
 (package! mediawiki)
 (package! memoize)
 (package! mw-thesaurus)
@@ -98,6 +149,7 @@
 (package! pfuture)
 (package! pinboard)
 (package! pinboard-popular)
+(package! dogears)
 (package! prism)
 (package! screencast)
 (package! shelldon)
@@ -110,26 +162,23 @@
 (package! elfeed-org)
 (package! tempel-collection)
 (package! ts)
-(package! unpackaged :recipe (:host github :repo "alphapapa/unpackaged.el"))
 (package! vc-msg)
 (package! vimgolf)
 (package! visual-regexp)
 (package! wgrep)
 (package! xr)
-(package! awesome-tray :recipe (:host github :repo "manateelazycat/awesome-tray"))
 
 ;; Org
 (package! org-anki)
 (package! org-transclusion)
 (package! org-roam)
+(package! org-roam-ui)
 (package! org-download)
 (package! htmlize)
-(package! org-gamify :recipe (:host bitbucket :repo "eeeickythump/org-gamify"))
-(package! gamify-el :recipe (:host github :repo "Idorobots/gamify-el"))
 ;; (package! org-recent-headings)
 ;; (package! org-roam-bibtex) ;; yes still relevant for org 9.5
-(package! org-roam-ui)
 ;; (package! org-tanglesync)
+;; (package! ox-rss)
 ;; (package! ox-rss)
 
 ;; Copypasta from Doom module (the complexity permits downloading a

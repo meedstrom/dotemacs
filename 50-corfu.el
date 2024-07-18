@@ -30,11 +30,13 @@
 ;; M-h -> corfu-show-documentation
 (use-package! corfu
   :init
-  (setopt corfu-auto t)
-  (setopt corfu-auto-delay 0.35)
-  (setopt tab-always-indent 'complete) ;; or use M-TAB to complete
+  (setopt corfu-quit-at-boundary nil)
+  (setopt tab-always-indent 'complete)
+  ;; (setopt corfu-auto t)
+  ;; (setopt corfu-auto-delay 0.35)
+  ;; (setopt tab-always-indent t) ;; Just bind `completion-at-point' to M-q
   :config
-  (setopt completion-cycle-threshold 3)
+  ;; (setopt completion-cycle-threshold 3)
   ;; invoke corfu for dabbrev instead of its own dabbrev-expand
   ;; (keymap-set [remap hippie-expand])
   ;; (global-corfu-mode)

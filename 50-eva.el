@@ -1,6 +1,22 @@
 ;; -*- lexical-binding: t -*-
 
-(defvar my-wlr-idle-tracker nil)
+;; (defvar my-wlr-idle-tracker nil)
+;; (setopt eva--idle-secs-fn
+;;           (defun my-idle-secs-wlroots ()
+;;             "Return idle-time in seconds, rounded to nearest 60.
+;; Should work for Wayland compositors implementing ext-idle-notify.
+;; In other words, if the swayidle program works, this should too."
+;;             (if (process-live-p my-wlr-idle-tracker)
+;;                 (if (file-exists-p "/tmp/idle")
+;;                     (string-to-number (f-read "/tmp/idle"))
+;;                   0)
+;;               (message (eva-emit "Restarting the daemon that counts idle-time"))
+;;               (setq my-wlr-idle-tracker
+;;                     (start-process "~/track-idle2.sh" nil "~/track-idle2.sh")
+;;                     ;; (file-name-concat (file-name-directory (find-library-name "eva"))
+;;                     ;;                    "track-idle2.sh")
+;;                     )
+;;               0)))
 
 ;; (start-process "swayidle-eva" nil "swayidle" "timeout" "60" "")
 ;; (my-idle-secs-wlr)
@@ -11,30 +27,13 @@
 (setopt eva-idle-log-path         "/home/kept/self-data/idle.tsv")
 (setopt eva-buffer-focus-log-path "/home/kept/self-data/buffer-focus.tsv")
 (setopt eva-buffer-info-path      "/home/kept/self-data/buffer-info.tsv")
+(setopt eva-past-sample-function #'eva-past-sample-casual)
 ;; (setopt eva-main-ledger-path      "~/finances.ledger")
 ;; (setopt eva-main-datetree-path    "/foo")
 (use-package! eva
-  :disabled
   :config
   (setopt ess-ask-for-ess-directory nil) ;; Prevent annoying ESS startup prompt
   (require 'eva-builtin)
-  (setopt eva--idle-secs-fn
-          (defun my-idle-secs-wlroots ()
-            "Return idle-time in seconds, rounded to nearest 60.
-Should work for Wayland compositors implementing ext-idle-notify.
-In other words, if the swayidle program works, this should too."
-            (if (process-live-p my-wlr-idle-tracker)
-                (if (file-exists-p "/tmp/idle")
-                    (string-to-number (f-read "/tmp/idle"))
-                  0)
-              (message (eva-emit "Restarting the daemon that counts idle-time"))
-              (setq my-wlr-idle-tracker
-                    (start-process "~/track-idle2.sh" nil "~/track-idle2.sh")
-                    ;; (file-name-concat (file-name-directory (find-library-name "eva"))
-                    ;;                    "track-idle2.sh")
-                    )
-              0)))
-
   ;; These are looked up by `eva-present-diary', but org-journal is not needed.
   (setq org-journal-dir "/home/kept/roam/daily/")
   ;; (setq org-journal-file-format "%F.org")
@@ -42,46 +41,54 @@ In other words, if the swayidle program works, this should too."
   (add-hook 'eva-after-load-vars-hook #'eva-check-dangling-clock)
   (add-hook 'eva-after-load-vars-hook #'eva-check-org-vars)
 
+  (eva-defun eva-present-outcomes-or-agenda ()
+    (require 'org-agenda)
+    (require 'org-id)
+    (message (eva-emit "Here are your Org'd thoughts."))
+    (sit-for eva-sit-short)
+    (if (> (ts-hour (ts-now)) 18)
+        ;; Late in the day is more of a review-time, so show agenda
+        (progn
+          (org-agenda-list)
+          (push (current-buffer) eva-excursion-buffers))
+      ;; Still early, so show desired outcomes and task ideas
+      (org-id-goto "3ec7f712-2437-4222-8905-72d39ba6188a")
+      (push (current-buffer) eva-excursion-buffers)
+      (if (one-window-p) (split-window))
+      (other-window 1)
+      (org-id-goto "c55ab064-0db2-4556-aa24-0c3c8dce9e76")
+      (push (current-buffer) eva-excursion-buffers))
+    (eva-stop-queue))
+
   (setq eva-items
         (list
          (eva-item-create :fn #'eva-greet
                           :min-hours-wait 1)
 
-         (eva-item-create :fn #'eva-query-mood
-                          :dataset "/home/kept/self-data/mood.tsv"
-                          :min-hours-wait 1)
+         ;; (eva-item-create :fn #'eva-query-mood
+         ;;                  :dataset "/home/kept/self-data/mood.tsv"
+         ;;                  :min-hours-wait 1)
 
          (eva-item-create :fn #'eva-present-diary
                           :max-successes-per-day 1)
 
-         (eva-item-create :fn #'eva-query-sleep
-                          :dataset "/home/kept/self-data/sleep.tsv"
-                          :min-hours-wait 5
-                          :lookup-posted-time t)
+         ;; (eva-item-create :fn #'eva-query-sleep
+         ;;                  :dataset "/home/kept/self-data/sleep.tsv"
+         ;;                  :min-hours-wait 5
+         ;;                  :lookup-posted-time t)
 
          ;; (eva-item-create :fn #'eva-present-ledger-report)
 
          ;; May be slow
          ;; (eva-item-create :fn #'eva-present-org-agenda-log-archive)
-         (eva-item-create :fn #'eva-present-org-agenda-log)
-
-         ;; (eva-item-create :fn #'eva-query-ingredients
-         ;;                  :dataset "~/self-data/ingredients.tsv"
-         ;;                  :min-hours-wait 5)
-
-         ;; (eva-item-create :fn #'eva-query-cold-shower
-         ;;                  :dataset "~/self-data/cold.tsv"
-         ;;                  :max-entries-per-day 1)
-
-         (eva-item-create :fn #'eva-query-activity
-                          :dataset "/home/kept/self-data/activities.tsv"
-                          :min-hours-wait 1)
+         ;; (eva-item-create :fn #'eva-present-org-agenda-log)
+         (eva-item-create :fn #'eva-present-outcomes-or-agenda)
 
          ;; you can inline define the functions too
          (eva-item-create
           :fn (eva-defun my-bye ()
-                         (message (eva-emit "All done for now."))
-                         (bury-buffer (eva-buffer-chat)))
+                (message (eva-emit "All done for now."))
+                (bury-buffer (eva-buffer-chat)))
           :min-hours-wait 0)))
 
   ;; Hotkeys in the chat buffer
@@ -106,5 +113,5 @@ In other words, if the swayidle program works, this should too."
               (eva-activity-create :name "coding")
               (eva-activity-create :name "unknown")))
 
-  ;; (eva-mode)
+  (eva-mode)
   )

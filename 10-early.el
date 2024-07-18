@@ -7,11 +7,6 @@
 
 ;;; Backups
 
-;; Backups saved my skin in 2015, 2016, 2018, and 2020.
-;; So I should not stop using them until 2030 or so, given no more incidents.
-;; And I'll probably keep them forever.  The root issue with "GiT cAn RePlAcE
-;; bAcKuPs!" is I don't commit regularly in every project nor do I even have a
-;; git project everywhere.
 (setopt
  ;; Put them in the unusual path /home/backups/ to avoid cluttering rg output.
  backup-directory-alist `(("." . "/home/backups"))
@@ -20,7 +15,7 @@
  make-backup-files t ;; undoom
  version-control t)
 
-;; Graceful degradation
+;; Graceful degrade
 (unless (file-writable-p "/home/backups/")
   (error "Disabling backups because can't write to: /home/backups/")
   (setq backup-directory-alist nil)
@@ -40,7 +35,7 @@
 (add-hook 'prog-mode-hook #'my-hippie-config)
 (add-hook 'text-mode-hook #'my-hippie-config)
 
-;; Catch mistakes in my elisp on save, handy when hacking initfiles
+;; Catch mistakes in my elisp on save
 (add-hook 'after-save-hook #'my-compile-and-drop)
 
 ;; Prevent accidental edits (easy to miss on files like this)
@@ -73,10 +68,11 @@
 (add-to-list 'initial-frame-alist '(fullscreen . maximized))
 (add-to-list 'default-frame-alist '(alpha-background . 30))
 
-(defun my-transp-background ()
-  (interactive)
-  (set-frame-parameter nil 'alpha-background 80)
-  (set-face-background 'default "#000"))
+(add-hook 'elpaca-after-init-hook
+          (defun my-transp-background ()
+            (interactive)
+            (set-frame-parameter nil 'alpha-background 80)
+            (set-face-background 'default "#000")))
 
 
 ;;; Font

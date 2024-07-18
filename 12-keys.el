@@ -1,7 +1,15 @@
 ;; Key bindings -*- lexical-binding: t; -*-
 
-(require 'defrepeater) ;; not needed if i would just remember to call `repeat'!
+(require 'defrepeater) ;; not needed if I would just remember to call `repeat'!
 (require 'define-repeat-map)
+
+
+;;; Temporary unsets as training
+
+(keymap-unset global-map "C-s")
+(keymap-unset global-map "C-r")
+(keymap-unset global-map "M-%")
+(keymap-unset global-map "C-M-%")
 
 
 ;;; Create minor mode maps for modes that lack them
@@ -16,7 +24,7 @@
 ;; `general-describe-keybindings', although that one is cluttered by Doom's
 ;; settings, or bind-key's `describe-personal-keybindings'.  But I enjoy
 ;; handling them this way, and the upside with setting the bindings this early
-;; is that I still have them all when half my init has broken.
+;; is that I still have them when half my init has broken.
 
 (keymap-set global-map "<f10> a" #'my-save-buffer-and-amend)
 (keymap-set global-map "<f10> d" #'org-download-yank)
@@ -32,17 +40,6 @@
 (keymap-set global-map "<f10> r v" #'my-replace-var-at-point-with-value)
 (keymap-set global-map "<f10> r w" #'my-copy-region-or-rest-of-line-to-other-window)
 (keymap-set global-map "<f10> s" #'my-save-buffer-and-commit)
-(keymap-set global-map "<f2> (" #'app-launcher-run-app)
-(keymap-set global-map "<f2> 1" (defrepeater #'my-insert-other-buffer-file-name-and-cycle))
-(keymap-set global-map "<f2> 2" (defrepeater #'my-toggle-selective-display))
-(keymap-set global-map "<f2> 3" #'elfeed)
-(keymap-set global-map "<f2> 5" #'my-lookup-word)
-(keymap-set global-map "<f2> <f2>" #'vc-msg-show)
-(keymap-set global-map "<f2> <f3>" #'git-messenger:popup-message)
-(keymap-set global-map "<f2> <next>" (defrepeater #'my-next-buffer-of-same-mode))
-(keymap-set global-map "<f2> <prior>" (defrepeater #'my-previous-buffer-of-same-mode))
-(keymap-set global-map "<f2> b" #'backup-walker-start)
-(keymap-set global-map "<f2> d" #'my-insert-today)
 (keymap-set global-map "<f2> e d" #'eval-defun)
 (keymap-set global-map "<f2> e e" #'eval-last-sexp)
 (keymap-set global-map "<f2> e l" #'load-library)
@@ -50,20 +47,8 @@
 (keymap-set global-map "<f2> e r" #'eval-region)
 (keymap-set global-map "<f2> e s" #'ess-eval-region-or-function-or-paragraph-and-step) ;; ess everywhere
 (keymap-set global-map "<f2> e x" #'eval-expression)
-(keymap-set global-map "<f2> f" #'org-node-find)
-(keymap-set global-map "<f2> i" #'org-node-insert-link)
-(keymap-set global-map "<f2> g" #'git-timemachine)
-(keymap-set global-map "<f2> h" #'consult-find)
-(keymap-set global-map "<f2> j" #'+default/find-file-under-here)
-(keymap-set global-map "<f2> k" #'+default/search-project)
-(keymap-set global-map "<f2> l" #'helm-locate)
 (keymap-set global-map "<f2> m" #'my-last-daily-file)
 (keymap-set global-map "<f2> n" #'org-roam-dailies-capture-today)
-(keymap-set global-map "<f2> p" #'my-spawn-process)
-(keymap-set global-map "<f2> r" #'vertico-repeat)
-(keymap-set global-map "<f2> s" #'helm-selector-shell)
-(keymap-set global-map "<f2> w" #'sp-rewrap-sexp)
-(keymap-set global-map "<f2> x" #'execute-extended-command)
 (keymap-set global-map "<f2> z" #'my-sleep)
 (keymap-set global-map "<f5>" #'repeat)
 (keymap-set global-map "C-0" #'hippie-expand)
@@ -76,7 +61,6 @@
 (keymap-set global-map "C-8" #'kill-whole-line)
 (keymap-set global-map "C-9" #'duplicate-dwim)
 (keymap-set global-map "C-;" #'embark-act) ;; like doom, but in all buffers
-(keymap-set global-map "C-x s" #'save-some-buffers)
 (keymap-set global-map "C-<next>" #'iflipb-next-buffer)
 (keymap-set global-map "C-<prior>" #'iflipb-previous-buffer)
 (keymap-set global-map "C-M-/" #'dabbrev-expand)
@@ -88,15 +72,18 @@
 (keymap-set global-map "C-h s" #'find-function)
 (keymap-set global-map "C-h t" #'doom/toggle-profiler)
 (keymap-set global-map "C-q" #'my-dired-shell-cycle)
-(keymap-set global-map "C-x C-c" #'restart-emacs)
 (keymap-set global-map "C-x C-\;" (defrepeater #'comment-line))
+(keymap-set global-map "C-x C-c" #'restart-emacs)
+(keymap-set global-map "C-x g g" #'magit-status)
+(keymap-set global-map "C-x g t" #'git-timemachine)
 (keymap-set global-map "C-x k c" #'consult-kmacro)
+(keymap-set global-map "C-x s" #'save-some-buffers)
 (keymap-set global-map "M-/" #'dabbrev-completion)
 (keymap-set global-map "M-1" #'switch-to-buffer)
 (keymap-set global-map "M-2" #'my-other-window-any-frame-hyprland)
 (keymap-set global-map "M-<backspace>" #'sp-backward-unwrap-sexp)
 (keymap-set global-map "M-<delete>" #'sp-unwrap-sexp)
-(keymap-set global-map "M-<f4>" #'kill-current-buffer)
+(keymap-set global-map "M-<f4>" #'kill-current-buffer) ;; EXWM
 (keymap-set global-map "M-<insert>" #'sp-rewrap-sexp)
 (keymap-set global-map "M-g a a" (defrepeater #'avy-pop-mark))
 (keymap-set global-map "M-g a c" #'avy-goto-char-2)
@@ -129,27 +116,56 @@
 (keymap-set global-map "M-m p" (defrepeater #'pop-to-mark-command))
 (keymap-set global-map "M-m r" #'rectangle-mark-mode) ;; was C-x SPC
 (keymap-set global-map "M-m x" #'exchange-point-and-mark) ;; also on C-x C-x
+(keymap-set global-map "M-o (" #'app-launcher-run-app)
 (keymap-set global-map "M-o -" #'doom/decrease-font-size)
+(keymap-set global-map "M-o 1" (defrepeater #'my-insert-other-buffer-file-name-and-cycle))
+(keymap-set global-map "M-o 2" (defrepeater #'my-toggle-selective-display))
+(keymap-set global-map "M-o 3" #'elfeed)
+(keymap-set global-map "M-o 5" #'my-lookup-word)
+(keymap-set global-map "M-o <f3>" #'git-messenger:popup-message)
+(keymap-set global-map "M-o <next>" (defrepeater #'my-next-buffer-of-same-mode))
+(keymap-set global-map "M-o <prior>" (defrepeater #'my-previous-buffer-of-same-mode))
 (keymap-set global-map "M-o =" #'doom/increase-font-size)
 (keymap-set global-map "M-o M--" #'doom/decrease-font-size)
+(keymap-set global-map "M-o M-o" #'vc-msg-show)
+(keymap-set global-map "M-o a" #'org-agenda)
+(keymap-set global-map "M-o b" #'backup-walker-start)
+(keymap-set global-map "M-o c" #'org-capture)
+(keymap-set global-map "M-o d" #'my-insert-today)
+(keymap-set global-map "M-o f" #'org-node-find)
+(keymap-set global-map "M-o h" #'consult-find)
+(keymap-set global-map "M-o i" #'org-node-insert-link)
+(keymap-set global-map "M-o l" #'helm-locate)
+(keymap-set global-map "M-o p" #'my-spawn-process)
+(keymap-set global-map "M-o r" #'vertico-repeat)
+(keymap-set global-map "M-o s" #'helm-selector-shell)
+(keymap-set global-map "M-o w" #'sp-rewrap-sexp)
+(keymap-set global-map "M-o x" #'execute-extended-command)
+(keymap-set global-map "M-o y" (defrepeater #'my-fill-unfill-respect-double-space))
+(keymap-set global-map "M-q b" (defrepeater #'bury-buffer))
+(keymap-set global-map "M-q k" (defrepeater #'kill-current-buffer))
+(keymap-set global-map "M-q r" #'my-revisit-buffer)
+(keymap-set global-map "M-q u" (defrepeater #'unbury-buffer))
+(keymap-set global-map "M-q" #'completion-at-point)
 (keymap-set global-map "M-s 5" #'query-replace)
 (keymap-set global-map "M-s 6" #'query-replace-regexp)
 (keymap-set global-map "M-s d" #'+default/search-cwd)
-(keymap-set global-map "M-s f" (defrepeater #'my-fill-unfill-respect-double-space))
 (keymap-set global-map "M-s l" #'+default/find-file-under-here)
-(keymap-set global-map "M-s m" #'consult-multi-occur)
+(keymap-set global-map "M-s m" #'consult-line-multi)
 (keymap-set global-map "M-s p" #'+default/search-project)
 (keymap-set global-map "M-s r" #'isearch-backward)
 (keymap-set global-map "M-s s" #'isearch-forward)
 (keymap-set global-map "M-|" #'my-shell-command-replace-region)
 ;; (keymap-set global-map "C-q" #'+shell/here)
+;; (keymap-set global-map "M-o j" #'+default/find-file-under-here)
+;; (keymap-set global-map "M-o k" #'+default/search-project)
 ;; (keymap-set global-map "M-r" #'hkey-either)
 ;; (keymap-set global-map "TAB" #'my-tab-command)
 
 (keymap-set isearch-mode-map "<down>" #'isearch-repeat-forward)
 (keymap-set isearch-mode-map "<up>" #'isearch-repeat-backward)
-(keymap-set isearch-mode-map "M-s n" #'isearch-repeat-forward)
-(keymap-set isearch-mode-map "M-s p" #'isearch-repeat-backward)
+(keymap-set isearch-mode-map "M-s" #'isearch-repeat-forward)
+(keymap-set isearch-mode-map "M-r" #'isearch-repeat-backward)
 (keymap-set my-abbrev-minor-mode-map "`" #'expand-abbrev)
 
 ;; (keymap-set "" #'consult-focus-lines)  ;; Man.  Disturbing command.
@@ -188,16 +204,17 @@
 (setopt doom-leader-alt-key "<f3>")
 (setopt doom-localleader-alt-key "<f4>")
 
-;; Vimmers' obsession with typing capital letters, I swear...  There needs to
-;; exist an alternative module like this but that binds no capital letters.
+;; Vimmers' Stockholm syndrome with typing capital letters...  There
+;; needs to exist an alternative module like doom-keybinds but that binds no
+;; capital letters {nor any modifier, just lowercase things}
 (after! doom-keybinds
   (keymap-set doom-leader-map "f d" (keymap-lookup doom-leader-map "f D"))
   (keymap-set doom-leader-map "f c" (keymap-lookup doom-leader-map "f C")))
 
 ;; Overrides for Org localleader
 (my-hook-once 'org-load-hook
-  (map! :map org-mode-map :localleader "i" #'my-org-id-get-create-and-copy)
-  (map! :map org-mode-map :localleader "h" #'my-insert-heading-with-id))
+  (map! :map org-mode-map :localleader "i" #'org-node-nodeify-entry)
+  (map! :map org-mode-map :localleader "h" #'org-node-insert-heading))
 
 (after! mu4e
   ;; Uppercase key bindings for common actions, really?  Die.
@@ -205,10 +222,10 @@
   (keymap-unset mu4e-main-mode-map "C" t)
   (keymap-unset mu4e-main-mode-map "U" t)
   (keymap-unset mu4e-main-mode-map "R" t)
-  (keymap-unset mu4e-compose-mode-map "C-U" t)
   (keymap-set mu4e-main-mode-map "c" #'mu4e-compose-new)
-  (keymap-set mu4e-main-mode-map "r" #'mu4e-compose-reply)
   (keymap-set mu4e-main-mode-map "u" #'mu4e-update-mail-and-index)
+  (keymap-set mu4e-main-mode-map "r" #'mu4e-compose-reply)
+  (keymap-unset mu4e-compose-mode-map "C-U" t)
   (keymap-set mu4e-compose-mode-map "C-u" #'mu4e-update-mail-and-index))
 
 (after! dired-hist
@@ -301,7 +318,7 @@
 
 ;; broken
 ;; https://lists.gnu.org/archive/html/emacs-devel/2008-09/msg00638.html
-(set-quit-char ?\[)
+;; (set-quit-char ?\[)
 
 
 

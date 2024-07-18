@@ -42,7 +42,6 @@
       (insert (format-time-string "ran at %H:%M"))
       (my-esh-re-propertize-prompt-at-point))))
 
-
 ;; TODO Save lisp return values as actual lisp, not a string.  See
 ;; unintended result at c18:
 ;;

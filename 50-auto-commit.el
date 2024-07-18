@@ -64,7 +64,8 @@ Suitable on `after-save-hook'."
             ;; Special case for Org-Roam: auto-stage new notes, bc it happens often
             (and (equal "org" (file-name-extension (buffer-file-name)))
                  (string-search org-roam-directory default-directory)
-                 (magit-run-git "add" (buffer-file-name)))
+                 ;; (magit-run-git "add" (buffer-file-name))
+                 (my-exec "git" "add" (buffer-file-name)))
 
             (if (magit-untracked-files)
                 (message "Won't auto-commit.  Stage untracked files or edit .gitignore")
@@ -75,9 +76,11 @@ Suitable on `after-save-hook'."
                 (if (and (equal last-commit-date (format-time-string "%F"))
                          (equal last-commit-msg "Auto-commit"))
                     ;; Same day, so amend today's autocommit
-                    (magit-commit-amend '("--all" "--reuse-message=HEAD"))
+                    ;; (magit-commit-amend '("--all" "--reuse-message=HEAD"))
+                    (my-exec "git" "commit" "--all" "--amend" "--reuse-message=HEAD")
                   ;; New day, new commit
-                  (magit-commit-create '("--all" "--message=Auto-commit")))
+                  ;; (magit-commit-create '("--all" "--message=Auto-commit"))
+                  (my-exec "git" "commit" "--all" "--message=Auto-commit"))
                 ;; Maybe also push the newly committed changes
                 (when (member (project-root project) my-auto-pull-and-push-dirs)
                   (vc-pull-and-push))))))))))

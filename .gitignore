@@ -7,10 +7,9 @@
 /*-priv*.el
 /package.json
 /package-lock.json
-
+/node_modules/
 /mothball/
 /wip/
 /subed/
 /mail/
 /elfeed/
-/node_modules/

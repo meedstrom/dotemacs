@@ -1,23 +1,21 @@
 ;; -*- lexical-binding: t; -*-
 
-(run-with-idle-timer 10 nil #'require 'org)
-(run-with-idle-timer 11 nil #'require 'org-roam)
-(run-with-idle-timer 12 nil #'require 'dired)
+(run-with-idle-timer 2 nil #'require 'dired)
+(run-with-idle-timer 3 nil #'require 'org)
+(run-with-idle-timer 4 nil #'require 'org-roam)
+(run-with-idle-timer 5 nil #'org-agenda nil "n")
 (run-with-idle-timer 6 nil #'require 'magit)
-(run-with-idle-timer 8 nil #'require 'eshell)
+(run-with-idle-timer 7 nil #'require 'eshell)
 (run-with-idle-timer 8 nil #'require 'esh-mode)
 (run-with-idle-timer 9 nil (lambda ()
-                             ;; Preload all eshell modules by just creating an
+                             ;; Load all eshell modules by just creating an
                              ;; actual eshell in the background
                              (let ((inhibit-message t))
                                (save-window-excursion
                                  (eshell)
                                  (bury-buffer)))))
 
-;; (require 'beginend)
 (run-with-idle-timer 2 nil #'beginend-global-mode)
-
-;; (require 'form-feed)
 (run-with-idle-timer 2 nil #'global-form-feed-mode)
 (add-hook 'emacs-lisp-compilation-mode-hook #'form-feed-mode)
 

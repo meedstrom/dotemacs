@@ -37,11 +37,13 @@
                                   "ARCHIVE"
                                   "stub"
                                   "fren"
-                                  "privy"))
+                                  "privy"
+                                  "pub"))
   (add-to-list 'inline-anki-fields '("Online mirror" . my-anki-field-for-webpage))
-  (add-to-list 'inline-anki-ignore-file-regexps "/daily/")
-  (after! org
-    (add-to-list 'org-structure-template-alist '("f" . "flashcard"))))
+  (add-to-list 'inline-anki-ignore-file-regexps "/daily/"))
+
+(after! org
+  (add-to-list 'org-structure-template-alist '("f" . "flashcard")))
 
 (after! elfeed
   (setq elfeed-db-directory (concat doom-private-dir "elfeed/db/")

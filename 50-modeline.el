@@ -3,8 +3,7 @@
 
 ;; not perfect, but best so far
 ;; note: interferes with elfeed-goodies
-(use-package! awesome-tray
-  :config
+(use-package! awesome-tray :disabled :config
   ;; (setq awesome-tray-date-format "%H:%M")
   (setq awesome-tray-file-path-show-filename t)
 

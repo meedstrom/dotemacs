@@ -14,9 +14,6 @@
 ;;                     until (cl-evenp (pop list-of-unknown-length)))))))
 ;;  (function <) :key (function cdr))
 
-
-
-
 ;; (seq-do (lambda (file) (delete-file file)) (directory-files "/"))
 ;; (seq-do ((file) (delete-file file)) (directory-files "/"))
 
@@ -40,6 +37,11 @@
 
 ;; (td (:file-read "some-file") (:map ((it) (cons it 0)) :conc) (:fold #'max))
 
+
+;; (td ((it) (cons it 0))
+;;     ((it) (-reduce-r #'cons (cons it nil)))
+;;     ;; (-reduce-r #'cons '(1 2 3 4 5 nil))
+;;     (f-read "file"))
 
 ;; (defun cl--position (item seq start &optional end from-end)
 ;;   (if (listp seq)
@@ -93,7 +95,7 @@ Assumes there are no window dividers."
          (leftover-px (mod (frame-pixel-width) needed-window-px-width))
          (leftover-px-per-window (/ leftover-px n-windows-possible)))
     (cons n-windows-possible (/ leftover-px-per-window 2))))
-(set-fringe-mode (cdr (fringe-from-fill-column)))
+;; (set-fringe-mode (cdr (fringe-from-fill-column)))
 
 (defun window-leftover-px-after-satisfying-fill-column ()
   (let* ((pixels-per-char (/ (window-pixel-width) (window-total-width)))
@@ -129,13 +131,15 @@ Assumes there are no window dividers."
             (let ((max-px (window-leftover-px-after-satisfying-fill-column)))
               (set-window-fringes (selected-window) (/ max-px 2) (/ max-px 2) t)
               (when window-divider-mode (window-divider-mode 0))))))))
-   ;; Vertical group
+   ;; In vertical group
    ((window-combined-p (selected-window))
     )
    ;; No group; must be root window
    ((frame-root-window-p (selected-window))
     (let ((max-px (window-leftover-px-after-satisfying-fill-column)))
-      (set-window-fringes (selected-window) (/ max-px 2) (/ max-px 2))))))
+      (set-window-fringes (selected-window) (/ max-px 2) (/ max-px 2))))
+   (t
+    (message "pad-fringes-to-fill-column: Not expected to be here"))))
 
 
 
@@ -148,13 +152,13 @@ Assumes there are no window dividers."
 ;; `auto-save-mode' to grant us largely the same convenience:
 (setq auto-save-timeout 5)
 (setq auto-save-no-message t)
-(setq save-all-timer (run-with-idle-timer 40 t #'my-save-all))
+(setq my-save-all-timer (run-with-idle-timer 40 t #'my-save-all))
 (add-function :after after-focus-change-function #'my-save-all)
+;; (add-hook 'window-buffer-change-functions #'my-save-all)
+(add-hook 'magit-pre-display-buffer-hook #'my-save-all)
 (add-hook 'magit-pre-refresh-hook #'my-save-all)
 
-
 (advice-add 'after-find-file :before #'my-auto-recover-this-file)
-
 (let (mutually-recursed-once)
   (defun my-auto-recover-this-file (&optional _ _ _ after-revert _)
     (unless (or mutually-recursed-once after-revert)
@@ -168,6 +172,7 @@ Assumes there are no window dividers."
         (unwind-protect
             (recover-file buffer-file-name)
           (setq mutually-recursed-once nil))))))
+
 
 (hookgen doom-after-init-hook
   (setq my-stim-collection (my-stim-collection-generate)))

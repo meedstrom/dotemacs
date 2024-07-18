@@ -101,41 +101,6 @@ this function will insert before it."
       (newline)
       (apply #'insert strings))))
 
-;; see the line marked OVERRIDE, which is the only difference. i suspect the
-;; upstream design is a bug, but if it is really intended to have `unless',
-;; then propose adding this variant and the above compat wrapper
-(defmacro org-roam-with-file* (file keep-buf-p dont-save-p &rest body)
-  "Execute BODY within FILE.
-If FILE is nil, execute BODY in the current buffer.
-Kills the buffer if KEEP-BUF-P is nil, and FILE is not yet visited."
-  (declare (indent 3) (debug t))
-  `(let* (new-buf
-          (auto-mode-alist nil)
-          (find-file-hook nil)
-          (buf (or (and (not ,file)
-                        (current-buffer)) ;If FILE is nil, use current buffer
-                   (find-buffer-visiting ,file) ; If FILE is already visited, find buffer
-                   (progn
-                     (setq new-buf t)
-                     (find-file-noselect ,file)))) ; Else, visit FILE and return buffer
-          res)
-     (with-current-buffer buf
-       (unless (derived-mode-p 'org-mode)
-         (delay-mode-hooks
-           (let ((org-inhibit-startup t)
-                 (org-agenda-files nil))
-             (org-mode)
-             (hack-local-variables))))
-       (setq res (progn ,@body))
-       ;; (unless (and new-buf (not ,keep-buf-p))
-       ;; (when ,save-p  ;; ideal design, but hard to transition w backcompat
-       (unless (and new-buf (not ,keep-buf-p) (not ,dont-save-p)) ;;OVERRIDE
-         (save-buffer)))
-     (if (and new-buf (not ,keep-buf-p))
-         (when (find-buffer-visiting ,file)
-           (kill-buffer (find-buffer-visiting ,file))))
-     res))
-
 ;; used once
 (defun my-add-lw-ref-slugs ()
   (interactive)
@@ -444,36 +409,6 @@ Eshell, include that buffer in the cycle."
       (if (= 0 my-dsc-ctr)
           (my-eshell-here))))
   (setq my-dsc-ctr (mod (1+ my-dsc-ctr) my-dsc-max)))
-
-(defun my-org-open-at-point-as-maybe-roam-ref (&optional arg)
-  "Like `org-open-at-point', but prefer to visit any org-roam node
-that has the link as a ref.
-If already visiting that same node, then follow the link normally."
-  (interactive "P")
-  (let* ((url (thing-at-point 'url))
-         (path (if (derived-mode-p 'org-mode)
-                   (org-element-property :path (org-element-context))
-                 (replace-regexp-in-string (rx bol (* (not "/"))) "" url)))
-         (all-refs (org-roam-db-query
-                    [:select [ref id]
-                     :from refs
-                     :left-join nodes
-                     :on (= refs:node-id nodes:id)]))
-         (found (when path (assoc path all-refs))))
-
-    (if (and found
-             ;; check that the ref does not point to THIS file (if so, better to
-             ;; just open the url normally)
-             (not (when (derived-mode-p 'org-mode)
-                    (equal (cdr found)
-                           (or (org-id-get)
-                               (progn
-                                 (goto-char (point-min))
-                                 (org-id-get)))))))
-        (org-roam-node-visit (org-roam-node-from-id (cadr found)))
-      (if arg
-          (org-open-at-point arg)
-        (org-open-at-point)))))
 
 (defun my-all-recursive-subdirs (dir &optional exclude-dotfiles)
   (seq-filter #'file-directory-p
@@ -1830,6 +1765,7 @@ function to `aggressive-indent-mode-hook'."
   (with-eval-after-load 'org-habit
     ;; the default red color doesn't end up helping my psyche
     (set-face-attribute 'org-habit-overdue-face () :background (or (face-foreground 'font-lock-comment-face) 'unspecified))
+    (set-face-attribute 'org-habit-overdue-future-face () :background (or (face-foreground 'font-lock-comment-face) 'unspecified))
     )
   (with-eval-after-load 'rainbow-delimiters
     (set-face-attribute 'rainbow-delimiters-depth-3-face () :foreground 'unspecified :inherit 'font-lock-builtin-face)

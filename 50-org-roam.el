@@ -10,21 +10,23 @@
 (setq org-roam-file-exclude-regexp '("/logseq/bak/" "/logseq/version-files/"))
 (setopt org-roam-link-auto-replace nil)
 (setopt org-roam-db-update-on-save nil)
-(setq org-roam-db-gc-threshold (* 4 1000 1000 1000))
+;; (setq org-roam-db-gc-threshold (* 4 1000 1000 1000))
 (setq org-element-cache-persistent nil)
+
 
 ;;; Stuff
 
 ;; (define-key global-map [remap org-open-at-point] #'my-org-open-at-point-as-maybe-roam-ref)
-(add-hook 'org-roam-capture-new-node-hook #'my-org-add-:CREATED:)
+(add-hook 'org-roam-capture-new-node-hook #'org-node-put-created)
 (add-hook 'org-roam-buffer-postrender-functions #'magit-section-show-level-2)
 (after! org-roam
   (setopt org-roam-directory "/home/kept/roam/")
   (setopt org-roam-extract-new-file-path "${slug}.org")
   (setopt org-roam-ui-browser-function #'my-browse-url-chromium-kiosk))
 
-(when os-guix
-  (add-to-list 'browse-url-chromium-arguments "--no-sandbox"))
+;(when os-guix
+  
+  ;(add-to-list 'browse-url-chromium-arguments "--no-sandbox"))
 
 ;; ;; Use my own slug style (see `my-slugify')
 ;; (after! org-roam-node
@@ -32,20 +34,9 @@
 ;;     "Return the slug of NODE."
 ;;     (my-slugify (org-roam-node-title node))))
 
-(after! org-roam
-  (add-hook 'doom-load-theme-hook
-            (defun my-theme-mod-org ()
-              ;; instead of red todo, i use green IDEA
-              (let ((green (face-foreground 'success))
-                    (grey (face-foreground 'org-drawer)))
-                (set-face-foreground 'org-todo green)
-                (set-face-foreground 'org-done grey))
-              ;; for backlinks buffer
-              (set-face-attribute 'org-roam-title nil :height 1.5)))
-  (my-theme-mod-org))
 
 ;; When I have a fresh thought, avoid distraction by any earlier stuff I
-;; wrote (ADHD is a bitch)
+;; wrote (ADHD)
 (after! org-roam-dailies
   (advice-add 'org-roam-dailies-capture-today :after
               (defun my-recenter-top (&rest args)

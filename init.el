@@ -4,12 +4,12 @@
        :emacs dired
        :term shell
        :checkers spell
-       ;; :app irc
+       :app irc
        :email mu4e
        :config (default +bindings +smartparens)
 
        :ui
-       (vc-gutter)
+       vc-gutter
        hl-todo
        ligatures
 
@@ -29,6 +29,6 @@
        tree-sitter
        editorconfig
        lsp
-       (magit)
-       ;; (magit +forge)
+       ;; (magit)
+       (magit +forge)
        pdf)

@@ -1,27 +1,22 @@
 ;; -*- lexical-binding: t; -*-
 
-;; Improve org performance
-(global-auto-composition-mode 0)
-(setopt bidi-display-reordering nil)
-
 (setopt org-timestamp-custom-formats '("%Y-%b-%d" . "%Y-%m-%d %a %H:%M"))
 (setopt org-pretty-entities t)
 (setopt org-archive-location "/home/kept/roam/noagenda/archive.org::datetree/")
 (setopt org-clock-persist t)
 (setopt org-clock-auto-clock-resolution t)
 ;; (setopt org-startup-folded 'nofold)
-(setopt org-agenda-include-diary t)
 (setopt citar-bibliography '("/home/kept/roam/refs/library_biblatex.bib"))
-(setopt org-agenda-todo-list-sublevels nil)
-(setopt org-agenda-todo-ignore-scheduled t)
+;; (setopt org-agenda-todo-list-sublevels nil)
+(setopt org-agenda-include-diary nil) ;; perf... :(
 (setopt org-agenda-dim-blocked-tasks nil) ;; perf
 (setopt org-agenda-use-tag-inheritance '(todo search)) ;; perf
 (setopt org-agenda-ignore-properties '(stats)) ;; perf
 (setopt org-agenda-inhibit-startup t) ;; perf
 (setopt org-archive-save-context-info '(time file itags olpath))
-(setopt org-pomodoro-play-sounds nil)
 (setopt org-export-backends '(html latex odt texinfo))
 (setopt org-export-with-toc nil)
+(setopt org-timestamp-formats (cons "%Y-%m-%d" "%Y-%m-%d %a %H:%M"))
 (setopt org-clock-out-remove-zero-time-clocks t)
 (setopt org-clock-idle-time 5)
 (setopt org-hide-leading-stars nil)
@@ -36,93 +31,90 @@
 ;; (setopt org-ellipsis "⤵")
 (setopt org-ellipsis "…")
 (setopt org-hide-emphasis-markers t) ; hide the *, =, and / markers
-(setopt org-image-actual-width '(200)) ; use #ATTR if available, else 200 px
+(setopt org-image-max-width 300)
+;; (setopt org-image-actual-width '(200)) ; use #ATTR if available, else 200 px
 ;; (setopt org-latex-compiler "xelatex") ; allow unicode (åäö) in VERBATIM blocks
 (setopt org-log-done 'time)
 (setopt org-log-into-drawer t) ; hide spam
-(setopt org-modules '(org-id ol-info ol-eww)) ;; `org-eww-copy-for-org-mode'
+(setopt org-modules '(org-id org-habit org-gamify ol-info ol-eww)) ;; `org-eww-copy-for-org-mode'
 (setopt org-use-speed-commands t)
 (setopt org-clock-x11idle-program-name (or (executable-find "xprintidle") "x11idle"))
 (setopt org-replace-disputed-keys t)
 (setopt org-tags-column 0)
+(setopt org-startup-indented t)
 (setopt org-download-heading-lvl nil)
 (setopt org-download-image-dir "img/")
+(setopt org-clock-kill-emacs-query nil) ;; fix bug
 
-;; bug
-(setopt org-clock-kill-emacs-query nil)
+;; Make org faster
+(global-auto-composition-mode 0)
+(setopt bidi-display-reordering nil)
 
+(setopt consult-fontify-max-size 100000) ;; 0.1x default (weak computer)
+
+(setopt undo-limit (* 16 1000 1000)) ;; 16 MB, not default 160 kB
+(setopt undo-strong-limit (* 24 1000 1000))
+
+;; (setq org-node--debug nil)
 (use-package org-node
-  :hook ((org-mode . org-node-backlink-mode)
-         (org-mode . org-node-cache-mode)))
-
-;; (setq org-node-creation-fn #'org-node-new-by-roam-capture)
-(setq org-node-creation-fn #'org-capture)
-
-(setq org-node-extra-id-dirs
-      '("/home/kept/roam/"
-        "/home/me/.doom.d/"))
-
-(setopt org-node-format-candidate-fn
-        (lambda (node title)
-          (if (org-node-get-is-subtree node)
-              (let ((ancestors (cons (org-node-get-file-title-or-basename node)
-                                     (org-node-get-olp node)))
-                    (result nil))
-                (dolist (anc ancestors)
-                  (push (propertize anc 'face 'shadow) result)
-                  (push " > " result))
-                (push title result)
-                (string-join (nreverse result)))
-            title)))
-
-;; (concat (string-join (--map (propertize it 'face 'shadow)
-;;                                             ancestors)
-;;                                      " > ")
-;;                         " > "
-;;                         title)
+  :hook ((org-mode . org-node-cache-mode))
+  :init
+  (setopt org-node-extra-id-dirs '("/home/kept/roam/" "/home/me/.doom.d/"))
+  (setopt org-node-eagerly-update-link-tables t)
+  (setopt org-node-perf-assume-coding-system 'utf-8-unix)
+  :config
+  (org-node-complete-at-point-mode)
+  ;; (org-node-backlink-global-mode)
+  ;; (org-node-roam-db-shim-mode)
+  (org-node-fakeroam-nosql-mode)
+  (org-node-fakeroam-redisplay-mode)
 
 
-(after! org-node
   ;; Make sure the extracted subtree inherits any CREATED property,
   ;; else creates one for today
   (advice-add 'org-node-extract-subtree :around
-              (lambda (orig-fn &rest args)
+              (defun my-inherit-creation-date (orig-fn &rest args)
                 (let ((parent-creation
                        (save-excursion
-                         (while (not (or (bobp) (org-entry-get nil "CREATED")))
-                           (org-up-heading-or-point-min))
+                         (without-restriction
+                           (while (not (or (org-entry-get nil "CREATED")
+                                           (bobp)))
+                             (org-up-heading-or-point-min)))
                          (org-entry-get nil "CREATED"))))
                   (apply orig-fn args)
+                  ;; Now in the new buffer
                   (org-entry-put nil "CREATED"
-                                 (or parent-creation (format-time-string "[%F]")))))))
+                                 (or parent-creation
+                                     (format-time-string "[%F %a]")))))))
 
-(setq org-capture-templates
-      '(("n" "ID node")
-        ("nc" "Capture to ID node (maybe creating it)"
-         plain (function org-node-capture-target) nil
-         :empty-lines-after 1)
-        ("nv" "Visit ID node (maybe creating it)"
-         plain (function org-node-capture-target) nil
-         :jump-to-captured t
-         :immediate-finish t)
-        ("ni" "Instantly create ID node without content & without visiting"
-         plain (function org-node-capture-target) nil
-         :immediate-finish t)))
+;; Different sets of settings to test
 
-;; (after! org-roam-mode
-;;   ;; (advice-remove 'org-roam-backlinks-get #'org-node--fabricate-roam-backlinks)
-;;   (advice-add 'org-roam-backlinks-get :override #'org-node--fabricate-roam-backlinks))
+;; (setopt org-node-ask-directory "/home/kept/roam")
+;; (setopt org-node-make-file-level-nodes nil)
+;; (setq org-node-slug-fn #'org-node-slugify-like-roam)
+;; (setq org-node-slug-fn #'org-node-slugify-as-url)
+;; (setq org-node-creation-fn #'org-node-new-by-roam-capture)
+;; (setq org-node-creation-fn #'org-node-new-file)
+(setq org-node-creation-fn #'org-capture)
+
+;; (setq org-node-alter-candidates t) ;; More completions than if nil
+;; (setq org-node-alter-candidates nil)
+
+(setq org-node-filter-fn
+      (lambda (node)
+        (not (or (string-search "archive/" (org-node-get-file-path node))
+                 (string-search "noagenda/" (org-node-get-file-path node))))))
+
+;; (require 'org-roam)
+
+(add-hook 'doom-load-theme-hook
+          (defun my-theme-mod-org ()
+            (after! org-roam
+              ;; for backlinks buffer
+              (set-face-attribute 'org-roam-title nil :height 1.5))))
 
 ;; (setq-default org-display-custom-times t) ;; could it cause org-element bugs due to daily page titles?
-(setopt org-agenda-files
-        (-filter #'file-exists-p '(
-                                   ;; "/home/kept/roam/"   ;; slowww
-                                   ;; "/home/kept/roam/daily/" ;; sloww
-                                   ;; "/home/kept/roam/refs/"
-                                   ;; "/home/kept/roam/frozen/"
-                                   "/home/kept/roam/grismartin/pages/"
-                                   ;; to always cache the org-id locations
-                                   "/home/me/.doom.d/elfeed.org")))
+
 
 ;; (setopt org-babel-load-languages '((R . t)
 ;;                                    (emacs-lisp . t)
@@ -174,7 +166,7 @@
 (after! org
   (unless after-init-time
     (setq debug-on-error t)
-    (error (message "Org loaded during init, I don't want this")))
+    (message "Org loaded during init, I don't want this"))
 
 
   (require 'named-timer)

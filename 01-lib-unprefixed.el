@@ -5,6 +5,14 @@
 (require 'cl-lib)
 (require 'subr-x)
 
+(defun str-extract (regexp str)
+  (string-match regexp str)
+  (match-string 0 str))
+
+(defun str-replace (regexp rep str)
+  (replace-regexp-in-string regexp rep str))
+
+
 ;; ;; Backports for when I'm on an old Emacs
 ;; (when (> 29 emacs-major-version)
 ;;   (require 'compat)
@@ -41,15 +49,15 @@
 (defalias 'anon-hook #'hookgen)
 (defalias 'captain-hook #'hookgen)
 
-;; upstream soemthing like this?
-(defmacro time (&rest body)
+(defmacro time-return (&rest body)
   "Evaluate BODY and print time elapsed."
   (let ((T (cl-gensym)))
     `(let ((,T (current-time)))
        ,@body
        (message "Elapsed: %fs" (float-time (time-since ,T))))))
 
-(defmacro time-return (&rest body)
+;; upstream soemthing like this?
+(defmacro time (&rest body)
   "Evaluate BODY and print time elapsed.
 Then return the last value of BODY."
   (let ((T (cl-gensym)))

@@ -1,8 +1,9 @@
 ;; Completion systems (helm/vertico) -*- lexical-binding: t; -*-
 
 ;; wishlist
-;; - Some commands should not sort by length. e.g. M-x recentf (not that I use
-;;   that one).  how to config such thing?
+
+;; - Some commands should not sort by length but alphabetic. e.g. M-x recentf
+;;   (not that I use that one).  how to config such thing?
 
 ;; - Marginalia annotations go off-screen when one of the files have long name
 ;;   (especially when you use vertico-buffer-mode so you only get half screen
@@ -13,6 +14,16 @@
   (setopt helm-ff-DEL-up-one-level-maybe t)
   (when (modulep! :completion helm)
     (define-key global-map [remap switch-to-buffer] #'helm-mini)))
+
+;; Don't consult .gitignore, only .ignore
+;; NOTE: The setting seemed to have no effect, then I saw it's because I was
+;; using Doom's wrapper-command `+default/search-project' which actually
+;; overrides `consult-ripgrep-args'!  What happened to Doom's "bare metal"
+;; principle?  Now I keybind `consult-grep' directly instead.
+(after! consult
+  (setopt consult-ripgrep-args
+          (concat (custom--standard-value 'consult-ripgrep-args)
+                  " --no-ignore-vcs")))
 
 (advice-remove 'embark-completing-read-prompter
                '+vertico--embark-which-key-prompt-a)
