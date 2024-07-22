@@ -1,9 +1,0 @@
-# -*- mode: snippet -*-
-# name: new-xact
-# uuid: 
-# key: new-xact
-# condition: t
-# --
-`(format-time-string "%Y-%m-%d")` ! \"$0\"
-   $1      $2 SEK
-   Liabilities:Komplett

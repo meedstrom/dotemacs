@@ -1,7 +1,0 @@
-# -*- mode: snippet -*-
-# name: el
-# key: __el
-# --
-;; -*- lexical-binding: t; -*-
-
-$0

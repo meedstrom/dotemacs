@@ -1,5 +1,20 @@
 ;; -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2024 Martin Edström
+
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program. If not, see <http://www.gnu.org/licenses/>.
+
 ;;; Commentary:
 
 ;; Auto-commit on save in specific directories.
@@ -20,7 +35,7 @@
   "In which directories do you want to auto-commit all changes?")
 
 (defun my-auto-commit-maybe ()
-  "Create a new commit if the last was on a different day.
+  "Do a new commit if the last was on a different day.
 Otherwise just amend today's commit.
 
 Only operate if the project root directory is a member of
@@ -32,10 +47,10 @@ want to do the commits manually.
 
 Suitable on `after-save-hook'."
   (require 'magit)
+  (require 'magit-git)
   (require 'project)
   (require 'vc)
-  (let ((project (project-current))
-        (proc nil))
+  (let ((project (project-current)))
     (when project
       (when (member (project-root project) my-auto-pull-and-push-dirs)
         ;; (shell-command "git pull")

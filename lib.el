@@ -1,11 +1,220 @@
-;; A collection of defuns -*- lexical-binding: t; -*-
+;; -*- lexical-binding: t; byte-compile-warnings: '(not free-vars); -*-
 
-(require 'cl-lib)
-(require 'seq)
-(require 'subr-x)
-(require 'dash)
-(require 'crux)
+;; Copyright (C) 2024 Martin Edström
 
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+(eval-when-compile
+  (require 'cl-lib)
+  (require 'seq)
+  (require 'map)
+  (require 'subr-x)
+  (require 'dash)
+  (require 'crux))
+
+(defun me/maybe-revert-buffer ()
+  (require 'autorevert)
+  (unless (or auto-revert-mode (active-minibuffer-window))
+    (let ((auto-revert-mode t))
+      (auto-revert-handler))))
+
+(defun me/maybe-revert-visible-buffers ()
+  (dolist (buf (seq-filter #'get-buffer-window (buffer-list)))
+    (with-current-buffer buf
+      (me/maybe-revert-buffer))))
+
+(defun me/org-setup-prettify ()
+  (setq prettify-symbols-alist
+        (cl-union prettify-symbols-alist
+                  '(;; Still waiting for the Year of AsciiMath on Org-mode...
+                    ("\\vdots" . "⋮")
+                    ("\\implies" . "⟹")
+                    ("\\sqrt" . "√")
+                    ("\\ldots" . "…")))))
+
+(defun me/corfu-send-shell (&rest _)
+  "Send completion candidate when inside comint/eshell.
+The idea is to avoid pressing RET twice; see README at
+https://github.com/minad/corfu."
+  (cond
+   ((and (derived-mode-p 'eshell-mode)
+         (fboundp 'eshell-send-input))
+    (eshell-send-input))
+   ((and (derived-mode-p 'comint-mode)
+         (fboundp 'comint-send-input))
+    (comint-send-input))))
+
+(defun me/corfu-enable-always-in-minibuffer ()
+  "Enable Corfu in the minibuffer if Vertico is not active."
+  (unless (bound-and-true-p vertico--input)
+    ;; (setq-local corfu-auto nil) Enable/disable auto completion
+    (corfu-mode)))
+
+;; https://github.com/minad/corfu/wiki#same-key-used-for-both-the-separator-and-the-insertion
+(defun me/complete-on-double-space ()
+  "Makes sense only with `corfu-separator' 32 (space)."
+  (interactive)
+  (if current-prefix-arg
+      ;;we suppose that we want leave the word like that, so do a space
+      (progn
+        (corfu-quit)
+        (insert " "))
+    (if (and (= (char-before) corfu-separator)
+             (or
+              ;; check if space, return or nothing after
+              (not (char-after))
+              (= (char-after) ?\s)
+              (= (char-after) ?\n)))
+        (progn
+          (corfu-insert)
+          (insert " "))
+      (corfu-insert-separator))))
+
+(defmacro me/run-after (secs &rest body)
+  (declare (indent defun))
+  `(run-with-timer ,secs nil (lambda () ,@body)))
+
+(defun me/as-string (x)
+  "Return X as a string, even if it was a symbol or character.
+Danger: if X is an integer, assumes it is a character code."
+  (cond ((stringp x) x)
+        ((symbolp x) (symbol-name x))
+        ((characterp x) (char-to-string x))))
+
+;; upstream?
+(defun me/tee (pre input)
+  "Convenient debugging!"
+  (message "%s %s" pre input)
+  input)
+
+;; upstream?
+(defun me/buffer-has-undo-history-p ()
+  (and (not (eq t buffer-undo-list))
+       (not (null buffer-undo-list))))
+
+(defmacro me/while-progn (&rest body)
+  "Lets you indent less than a (while (progn)) form."
+  `(while (progn ,@body)))
+
+;; So you can type (hookgen org-mode-hook (set-face-attribute ...) ...).
+;; I'm split between this method and llama.el, leaning towards llama.el.
+(defmacro me/genhook (hook &rest body)
+  (declare (indent defun))
+  (let ((fname (cl-gensym)))
+    `(add-hook ',hook (defun ,fname () ,@body))))
+
+(defmacro me/unihook (hook &rest body)
+  "Like `me/genhook' but does not generate a new function each time.
+Instead, overrides the previous definition, so there is only ever
+one function for each unique HOOK.  This idempotence makes it
+safe to re-load initfiles."
+  (declare (indent defun))
+  (let ((fname (intern (concat "me/" (symbol-name hook) "-fn"))))
+    `(add-hook ',hook (defun ,fname () ,@body))))
+
+(defun me/str-extract (regexp str)
+  (string-match regexp str)
+  (match-string 0 str))
+
+;; FIXME
+(defun my-dired-git-info-prevent-maybe ()
+  "Prevent Git Info mode in large directories."
+  (let ((dirname
+         (expand-file-name
+          (if (consp dired-directory)
+              (car dired-directory)
+            dired-directory))))
+    (when (> (length (directory-files dirname)) 30)
+      (remove-hook 'dired-after-readin-hook #'dired-git-info-auto-enable 'local)
+      ;; TODO: The above did not work, so there's still a long initial load time
+      (dired-git-info-mode 0)
+      )))
+
+;; TODO Infer :host gitlab, :host nil etc
+(defmacro me/elpaca-url (url &rest keywords)
+  "Expand into `elpaca' with pre-filled arguments.
+
+If you were not going to specify a repo recipe, you can just call
+`use-package', but otherwise this macro lets you skip boilerplate
+and paste in an URL without the tedium of cutting it into parts.
+
+First argument URL expands into the boilerplate
+\"elpaca (package-name :host github :repo \"partial-url\")\".
+
+KEYWORDS can be any of :name, :files, :depth, :branch.
+
+- See documentation for most of those at
+  https://github.com/progfolio/elpaca/blob/master/doc/manual.md
+- The keyword :name is unique to this macro, for setting a
+  package name that differs from the name in URL"
+  (let* ((files (plist-get keywords :files))
+         (depth (plist-get keywords :depth))
+         (branch (plist-get keywords :branch)))
+    `(elpaca (,(or (plist-get keywords :name)
+                   (intern (replace-regexp-in-string
+                            "^.*?github.com/.*?/" "" url)))
+              :host github
+              :repo ,(replace-regexp-in-string "^.*?github.com/" "" url)
+              ;; Don't implicitly quote args (confusing)
+              ,@(if branch (list :branch branch))
+              ,@(if depth (list :depth depth))
+              ,@(if files (list :files files))))))
+
+(defun me/toggle-profiler ()
+  (interactive)
+  (if (profiler-cpu-running-p)
+      (progn 
+	(profiler-stop)
+	(profiler-report))
+    (profiler-start 'cpu)))
+
+(defun me/handle-initialism-first-pattern (pattern index total)
+  "Treat the first pattern as possibly an initialism.
+If one of the chars in `orderless-affix-dispatch-alist' are
+present, pass the pattern to the next dispatcher, in case that is
+`orderless-affix-dispatch'."
+  (and (= index 0)
+       (not (string-match-p "^[!%&,=~^]" pattern))
+       (not (string-match-p "[!%&,=~^]$" pattern))
+       (quote (orderless-initialism
+	       orderless-prefixes
+	       orderless-literal
+	       orderless-regexp))))
+
+(defun me/log-process-name (&optional process _group)
+  "See `interrupt-process-functions'."
+  (when process
+    (message (process-name process)))
+  nil)
+
+(defun me/rg-cwd ()
+  (interactive)
+  (require 'consult)
+  (if (boundp 'doom-version)
+      (+default/search-cwd)
+    (let ((region-or-thing
+           (if (use-region-p)
+               (buffer-substring-no-properties (region-beginning) (region-end))
+             ;; See Doom sources
+             (if (memq (xref-find-backend) '(eglot elpy nox))
+                 (xref-backend-identifier-at-point (xref-find-backend))
+               (thing-at-point 'symbol t)))))
+      (consult--grep "rg: "
+                     #'consult--ripgrep-make-builder
+                     default-directory
+                     (when region-or-thing
+                       (regexp-quote region-or-thing))))))
 
 (defun my-commands-starting-with (prefix)
   (let (commands)
@@ -15,6 +224,7 @@
                      (push sym commands))))
     commands))
 
+;; Different algo
 (defun my-make-id* ()
   "Make a 6-character string of non-vowel letters."
   (my-int-to-consonants (+ 4084101 (random 81682019))))
@@ -22,12 +232,18 @@
 ;; (fset 'org-id-new #'my-make-id)
 (defun my-make-id (&rest _)
   (my-random-string 5 "bcdfghjklmnpqrstvwxyz"))
+;; (my-make-id)
 
 (defun my-random-string (n-chars alphabet)
+  (let ((alphabet-length (length alphabet)))
+    (concat (cl-loop repeat n-chars
+		     collect (elt alphabet (random alphabet-length))))))
+
+(defun my-random-string* (n-chars alphabet)
   (let ((chars (string-to-list alphabet))
         (alphabet-length (length alphabet)))
-    (concat
-     (cl-loop repeat n-chars collect (nth (random alphabet-length) chars)))))
+    (concat (cl-loop repeat n-chars
+		     collect (nth (random alphabet-length) chars)))))
 
 ;; WIP
 (defun my-bright-switch ()
@@ -40,49 +256,6 @@
 (defun my-eval-buffer-if-elisp ()
   (and (derived-mode-p 'emacs-lisp-mode)
        (eval-buffer)))
-
-(defun my-rename-and-relink-asset-at-point ()
-  (interactive)
-  (let ((thing (if (derived-mode-p 'dired-mode)
-                   (dired-get-filename)
-                 (thing-at-point 'existing-filename))))
-    (unless (string-prefix-p org-roam-directory thing)
-      (error "That file doesn't seem to be under `org-roam-directory'"))
-    (my-rename-roam-asset-and-rewrite-links t thing)))
-
-(defun my-rename-roam-asset-and-rewrite-links (&optional yy asset)
-  (interactive "P")
-  (when-let ((bufs (--filter (string-search "*grep*" (buffer-name it))
-                             (buffer-list))))
-    (if (or yy (yes-or-no-p "Existing *grep* buffers must be killed, ok?"))
-        (mapc #'kill-buffer bufs)
-      (error "Existing *grep* buffers would confuse this command, stopped")))
-  (let* ((default-directory org-roam-directory)
-         (filename (file-relative-name (or asset (read-file-name "File: "))))
-         (new* (read-string "New name: " filename))
-         ;; HACK replace spaces with underscores bc typing underscores is PITA
-         (new (concat (file-name-directory new*)
-                      (string-replace " " "_" (file-name-nondirectory new*)))))
-    (mkdir (file-name-directory new) t)
-    (unless (file-writable-p new)
-      (error "New path wouldn't be writable"))
-    (rgrep (regexp-quote filename) "*.org")
-    (run-with-timer
-     1 nil
-     (lambda ()
-       (save-window-excursion
-         (let ((default-directory org-roam-directory))
-           (delete-other-windows)
-           (switch-to-buffer (--find (string-search "*grep*" (buffer-name it))
-                                     (buffer-list)))
-           (wgrep-change-to-wgrep-mode)
-           (goto-char (point-min))
-           (query-replace filename new)
-           (wgrep-finish-edit)
-           (when (or yy (yes-or-no-p "Finished editing links, rename file?"))
-             (rename-file filename new)
-             (message "File moved to %s" new))))))
-    (message "Waiting for rgrep to populate buffer...")))
 
 (defun my-org-insert-after-front-matter (&rest strings)
   "Self-explanatory.
@@ -142,7 +315,7 @@ this function will insert before it."
      unless (string-search file "/logseq/")
      do (org-roam-with-file file nil
           (goto-char (point-min))
-          (let ((file-level-date (my-org-add-:CREATED:)))
+          (let ((file-level-date (my-org-add-or-get-:CREATED:)))
             (while (progn (org-next-visible-heading 1) (not (eobp)))
               (when (org-id-get)
                 (unless (org-entry-get nil "CREATED")
@@ -275,7 +448,7 @@ so the result is always that long or longer."
     (string-match-p (rx bol (= 4 digit) "-" (= 2 digit) "-" (= 2 digit) eol)
                     input)))
 
-(defun my-org-add-:CREATED: ()
+(defun my-org-add-or-get-:CREATED: ()
   "Add CREATED property to entry at point, if none already.
 If file-level entry, check if the #+TITLE already looks like a
 date, and use that.  Return the property value."
@@ -451,9 +624,9 @@ asynchronously so you can do something else."
   (let* ((urls (--map (substring it 2)
                       (-flatten (org-roam-db-query
                                  [:select [ref]
-                                  :from refs
-                                  :left-join nodes
-                                  :on (= refs:node-id nodes:id)]))))
+                                          :from refs
+                                          :left-join nodes
+                                          :on (= refs:node-id nodes:id)]))))
          (choice (completing-read "Insert at point" urls)))
     (when choice
       (insert "https://" choice))))
@@ -1174,7 +1347,7 @@ being called by certain hooks, such as
     (auto-save-visited-mode 0)
     (auto-revert-mode 0)
     ;; (global-auto-revert-mode 0)
-    (message "Disabled auto-save-visited-mode due to suspected failure to save.")
+    (message "Disabled auto-save-visited-mode & auto-revert-mode due to suspected failure to save.")
     (unless (ignore-errors (backup-buffer))
       (warn "Backup failed\; wiping backup-directory-alist to let you save anyway")
       (setq backup-directory-alist nil))))
@@ -1339,41 +1512,23 @@ split into three balanced windows."
 
 (defun my-insert-short-gpl-for-elisp ()
   "Insert the short brief of the GNU GPL as comment at the top of the file."
+  (interactive)
   (goto-char (point-min))
-  (insert (concat ";;; " (buffer-name) " -*- lexical-binding: t; -*-
-;; Copyright (C) " (format-time-string "%Y") " Martin Edström" "
-
-;; This program is free software: you can redistribute it and/or modify
-;; it under the terms of the GNU General Public License as published by
-;; the Free Software Foundation, either version 3 of the License, or
-;; (at your option) any later version.
-
-;; This program is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-;; GNU General Public License for more details.
-
-;; You should have received a copy of the GNU General Public License
-;; along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-;;; Commentary:
-
-;;; Code:
-
-(provide '" (string-remove-suffix ".el" (buffer-name)) ")
-
-;;; " (buffer-name) " ends here"))
+  (insert (concat ";;; " (buffer-name) " ---  -*- lexical-binding: t; -*-"))
+  (my-insert-short-gpl)
+  (insert (concat "\n;;; Commentary:\n\n;;; Code:\n\n(provide '"
+                  (string-remove-suffix ".el" (buffer-name))
+                  ")\n\n;;; " (buffer-name) " ends here"))
   (forward-line -3)
   (newline)
-  (newline))
+  (open-line 1))
 
 (defun my-insert-short-gpl ()
-  "Insert the short brief of the GNU GPL as comment at the top of the file."
+  "Insert the short brief of the GNU GPL as comment."
   (interactive)
-  (if (derived-mode-p 'emacs-lisp-mode)
-      (my-insert-short-gpl-for-elisp)
-    (goto-char (point-min))
-    (insert (buffer-name))
+  ;; (goto-char (point-min))
+  ;; (insert (buffer-name))
+  (let ((beg (point)))
     (insert (concat "
 Copyright (C) " (format-time-string "%Y") " Martin Edström" "
 
@@ -1390,7 +1545,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 "))
-    (comment-region (point-min) (point))))
+    (comment-region beg (point))))
 
 (defun my-toggle-dedicate-window ()
   (interactive)
@@ -1501,7 +1656,7 @@ instead of hippie-expand and set `tab-always-indent' to
 (defun my-minibuffer-setup ()
   (set (make-local-variable 'face-remapping-alist)
        `((default :foreground ,(face-foreground 'mode-line)
-          :background ,(face-background 'mode-line)))))
+                  :background ,(face-background 'mode-line)))))
 
 (defun my-minibuffer-setup* ()
   (set (make-local-variable 'face-remapping-alist)
@@ -1718,13 +1873,13 @@ See `my-normie-toggle' for explanation."
 (defvar my-normie-p nil
   "State variable, see `my-normie-toggle'.")
 
-(defun my-fix-pdf-midnight-colors ()
+(defun me/fix-pdftools-midnight-colors ()
   (setq pdf-view-midnight-colors (cons (face-foreground 'default)
                                        (face-background 'default))))
 
 (defface my-unimportant-latex-face
   '((t :height 0.7
-     :inherit font-lock-comment-face))
+       :inherit font-lock-comment-face))
   "Face used on less relevant math commands."
   :group 'my-faces)
 
@@ -1846,6 +2001,870 @@ function to `aggressive-indent-mode-hook'."
                       :foreground "black"
                       :weight 'bold))
 
-(provide 'my-lib)
+
+;;;; Eshell
 
-;;; my-lib.el ends here
+;; TODO: When one command output exceeded buffer scrollback, format a special
+;; message saying so inside the next prompt, mentioning time-elapsed and
+;; backref, then emit a new prompt
+;; (As an alternative, send a command that's just a #comment, with said
+;; message)
+
+;; Emulate my Dired "b" key for going up one directory.
+(defun eshell/b (&optional _args)
+  (let ((default-directory (file-name-parent-directory default-directory)))
+    (my-esh-here)))
+
+(defun me/esh-banner ()
+  (cl-loop
+   for cmd in '(my-esh-consult-history
+                my-esh-switch
+                my-esh-narrow-to-output
+                my-esh-narrow-to-prompt
+                my-esh-narrow-dwim
+                my-copy-region-or-rest-of-line-to-other-window
+                my-cycle-path-at-point-repeat
+                my-dired-shell-cycle
+                my-insert-other-buffer-file-name-and-cycle-repeat
+                my-eval-and-replace-print
+                my-replace-var-at-point-with-value
+                my-pipe
+                my-new-eshell
+                my-next-buffer-of-same-mode-repeat
+                my-previous-buffer-of-same-mode-repeat
+                dired-jump
+                shelldon)
+   with hints
+   collect (concat (string-pad (car (my-locate-keys cmd)) 12)
+                   "  "
+                   (symbol-name cmd))
+   into hints
+   finally return
+   (concat
+    "Welcome to the Emacs shell ⚘  \nCommands you may find nifty: \n\n"
+    (string-join (cl-sort hints #'string-lessp) "\n")
+    "\n")))
+
+
+;;; Narrowing shenanigans
+
+(defun my-esh-prev-line (&optional arg)
+  "Like `previous-line', but auto-narrow if on Eshell output.
+If butting up against the edge of a narrow region, widen.
+
+Meant to replace `previous-line'.  ARG is passed on."
+  (interactive "p")
+  (if (buffer-narrowed-p)
+      (my-prev-line-maybe-widen arg)
+    (my-esh-prev-line-maybe-narrow arg)))
+
+(defun my-esh-next-line (&optional arg)
+  "Like `next-line', but auto-narrow if on Eshell output.
+If butting up against the edge of a narrow region, widen.
+
+Meant to replace `next-line'.  ARG is passed on."
+  (interactive "p")
+  (if (buffer-narrowed-p)
+      (my-next-line-maybe-widen arg)
+    (my-esh-next-line-maybe-narrow arg)))
+
+(defun my-esh-prev-line-maybe-narrow (&optional arg)
+  "Like `previous-line', but auto-narrow if on Eshell output.
+ARG is passed on."
+  (interactive "p")
+  (previous-line arg)
+  (unless (buffer-narrowed-p)
+    (let ((prev-prompt-from-above-this-line
+           (save-mark-and-excursion
+             (eshell-previous-prompt 1)
+             (point)))
+          (prev-prompt-from-end-of-this-line
+           (save-mark-and-excursion
+             (goto-char (line-end-position))
+             (eshell-next-prompt -1)
+             (point))))
+      (when (= prev-prompt-from-above-this-line
+               prev-prompt-from-end-of-this-line)
+        ;; Not on a prompt, but in an output, so let's narrow.
+        (my-esh-narrow-to-output)))))
+
+(defun my-esh-next-line-maybe-narrow (&optional arg)
+  "Like `next-line', but auto-narrow if on Eshell output.
+ARG is passed on."
+  (interactive "p")
+  (next-line arg)
+  ;; (setq-local my--esh-scroll-position )
+  (unless (buffer-narrowed-p)
+    (let ((next-prompt-from-below-this-line
+           (save-mark-and-excursion
+             (goto-char (line-end-position))
+             (eshell-next-prompt 1)
+             (point)))
+          (next-prompt-from-start-of-this-line
+           (save-mark-and-excursion
+             (goto-char (line-beginning-position))
+             (eshell-next-prompt 1)
+             (point))))
+      (when (= next-prompt-from-below-this-line
+               next-prompt-from-start-of-this-line)
+        ;; Not on a prompt, but in an output, so let's narrow.
+        (my-esh-narrow-to-output)))))
+
+(defun my-prev-line-maybe-widen (&optional arg)
+  "Like `previous-line', but break out of a narrowed region.
+ARG is passed on."
+  (interactive "p")
+  (when (and (buffer-narrowed-p)
+             (not (region-active-p))
+             ;; On first line within narrow area
+             (not (string-match-p "\n" (buffer-substring (point-min) (point)))))
+    (widen)
+    (recenter nil t))
+  (previous-line arg))
+
+(defun my-next-line-maybe-widen (&optional arg)
+  "Like `next-line', but break out of a narrowed region.
+ARG is passed on."
+  (interactive "p")
+  (when (and (buffer-narrowed-p)
+             (not (region-active-p))
+             ;; On last line within narrow area
+             (not (string-match-p "\n" (buffer-substring (point) (point-max)))))
+    (widen)
+    (recenter nil t))
+  (next-line arg))
+
+(defun my-esh-narrow-to-prompt ()
+  "Narrow buffer to prompt at point."
+  (interactive)
+  (forward-line)
+  (narrow-to-region
+   (save-mark-and-excursion
+     (eshell-previous-prompt 1)
+     (line-beginning-position))
+   (save-mark-and-excursion
+     (eshell-next-prompt 1)
+     (re-search-backward eshell-prompt-regexp nil t)
+     (point))))
+
+(defun my-esh-narrow-to-output ()
+  "Narrow buffer to output at point."
+  (interactive)
+  (forward-line)
+  (narrow-to-region
+   (save-mark-and-excursion
+     (eshell-previous-prompt 1)
+     (forward-line)
+     (point))
+   (save-mark-and-excursion
+     (eshell-next-prompt 1)
+     (re-search-backward eshell-prompt-regexp nil t)
+     (point))))
+
+(defun my-esh-narrow-dwim ()
+  (interactive)
+  (if (buffer-narrowed-p)
+      (widen)
+    (my-esh-narrow-to-output)))
+
+(defun my-esh-next-prompt (n)
+  (interactive "p")
+  (if (buffer-narrowed-p)
+      (widen))
+  (eshell-next-prompt n))
+
+(defun my-esh-previous-prompt (n)
+  (interactive "p")
+  (if (buffer-narrowed-p)
+      (widen))
+  (eshell-previous-prompt n))
+
+(defun my-esh-consult-history ()
+  (interactive)
+  (consult-history (my-esh-history)))
+
+
+;;; At-point magic
+
+(defun my-copy-region-to-variable (name)
+  (interactive "SVariable name: ")
+  (set name (buffer-substring (region-beginning) (region-end))))
+
+(defun my-eval-and-replace-print ()
+  "Replace the preceding sexp with its value using prin1.
+See also `crux-eval-and-replace'."
+  (interactive)
+  (backward-kill-sexp)
+  (condition-case nil
+      (prin1 (eval (read (current-kill 0)))
+             (current-buffer))
+    (error (message "Invalid expression")
+           (insert (current-kill 0)))))
+
+(defun my-replace-envvar-at-point-with-value ()
+  (interactive)
+  (when-let* ((thing (thing-at-point 'sexp))
+              (bounds (bounds-of-thing-at-point 'sexp))
+              (value (if (string-match-p (rx bol "$") thing)
+                         (getenv (substring thing 1))
+                       (getenv thing))))
+    (delete-region (car bounds) (cdr bounds))
+    (insert value)))
+
+;; TODO: Merge with crux-eval-and-replace TODO: Alternatively, just hack
+;; eval-last-sexp to mark the sexp and copy result into kill ring, and
+;; additionally be able to "eval" envvars for their value.
+(defun my-replace-var-at-point-with-value ()
+  "Replace a variable at point with its value.
+This preferentially assumes it's an envvar (see `getenv'), with
+or without an initial $ sign, otherwise a Lisp variable."
+  (interactive)
+  (when-let* ((thing (thing-at-point 'sexp))
+              (bounds (bounds-of-thing-at-point 'sexp))
+              (value (if (string-match-p (rx bos "$") thing)
+                         (getenv (substring thing 1))
+                       (or (getenv thing)
+                           (buffer-local-value (intern thing) (current-buffer))
+                           (symbol-value (intern thing))))))
+    (delete-region (car bounds) (cdr bounds))
+    (insert value)))
+
+(defun my-replace-path-at-point-with-truename ()
+  (interactive)
+  (when-let* ((foo (thing-at-point 'filename))
+              (bounds (bounds-of-thing-at-point 'filename))
+              (truename (file-truename (substitute-in-file-name foo))))
+    (delete-region (car bounds) (cdr bounds))
+    (insert truename)))
+
+;; TODO: make undo work with it...
+(defvar my-cycle-path-options nil)
+(defun my-cycle-path-at-point ()
+  "Replace filename at point with a different way to express it.
+This may remove the directory component, use a path relative from
+`default-directory', or use a full filesystem path."
+  (interactive)
+  (require 'dash)
+  (require 'subr-x)
+  (if-let* ((bounds (bounds-of-thing-at-point 'filename))
+            (name (substitute-in-file-name (thing-at-point 'filename)))
+            (options (if (eq last-command this-command)
+                         my-cycle-path-options
+                       (setq my-cycle-path-options
+                             (-uniq (list (file-relative-name name)
+                                          (file-truename name)
+                                          (file-name-nondirectory name)))))))
+      ;; (Warning for Lisp-originated brain damage) Try to use only tail of
+      ;; list (via `member'), so we cycle thru the entire list instead of just
+      ;; flipping between the first two unique items.  If this let-binding is
+      ;; simple to you, you are beyond saving.
+      (let ((alts (or (remove name (member name options))
+                      (remove name options))))
+        (if (null alts)
+            (message "Couldn't find alternative way to express filename.")
+          (delete-region (car bounds) (cdr bounds))
+          (insert (car alts))))
+    (message "This probably isn't a filename.")))
+
+
+;;; History, scrollback...
+
+;; TODO: Always timestamp commands in history so they can be truly ordered.
+;;       Probably requires hacking eshell-hist-initialize etc. See wip.el.
+
+;; NOTE: This one just appends whole histories, so old commands in one buffer
+;; can come before recent commands in another buffer.
+(defun my-esh-history ()
+  "Return merged history for passing to `consult-history'.
+Takes histories of all currently open eshell buffers."
+  (let* ((histories (->> (--map (buffer-local-value 'eshell-history-file-name it)
+                                (my-esh-buffers))
+                         (-filter #'f-exists-p)
+                         (-filter #'f-readable-p)))
+         (histories-oldest-first
+          (seq-sort-by (lambda (x)
+                         (time-convert (file-attribute-modification-time
+                                        (file-attributes x))
+                                       'integer))
+                       #'>
+                       histories)))
+    (with-temp-buffer
+      (cl-loop for f in histories-oldest-first
+               do (insert-file-contents f))
+      (nreverse (s-split "\n" (buffer-string) t)))))
+
+(defun my-esh-here (&optional dir)
+  "Open or revisit a shell in DIR or the current directory.
+Note: doesn't scan for the shell buffers' `default-directory'
+values, but rather just looks at their names, expecting them to
+have been set by `my-esh-rename' on
+`eshell-directory-change-hook' and `eshell-mode-hook'."
+  (interactive)
+  (let* ((dir (or dir default-directory))
+         (name (my-generate-eshell-name dir)))
+    (if (get-buffer name)
+        (switch-to-buffer name)
+      (let ((default-directory dir))
+        (eshell "new"))
+      (setq-local eshell-history-file-name (my-esh-history-file dir))
+      (setq-local my-esh-scrollback-file (my-esh-scrollback-file dir))
+      (eshell-hist-initialize)
+      ;; (my-restore-scrollback)
+      )))
+
+(defun my-esh-buffers ()
+  "Return a list of live eshell buffers."
+  (cl-loop for buf in (buffer-list)
+           when (eq (buffer-local-value 'major-mode buf) #'eshell-mode)
+           collect it))
+
+;; wip
+;; TODO: test it
+;; TODO: put setq-local etc on eshell mode hook and eshell change directory hook
+;; (defun my-esh-here* ()
+;;   "Open or revisit a shell in the current directory.
+;; Attempts to scan all live eshell buffers."
+;;   (interactive)
+;;   (let* ((bufs (my-esh-buffers))
+;;          (dir default-directory)
+;;          (dirs-bufs-alist
+;;           (-zip (--map (buffer-local-value 'default-directory it) bufs)
+;;                 bufs)))
+;;     (if (member dir (map-keys bufs-dirs-alist))
+;;         (switch-to-buffer (map-elt bufs-dirs-alist dir))
+;;       (let ((default-directory dir))
+;;         (eshell "new"))
+;;       (setq-local eshell-history-file-name (my-esh-history-file dir))
+;;       (setq-local my-esh-scrollback-file (my-esh-scrollback-file dir))
+;;       (eshell-hist-initialize))
+;;     ;; (my-restore-scrollback)
+;;     ))
+
+(defun my-esh-history-file (&optional dir)
+  (expand-file-name ".eshell-command-history" (or dir default-directory)))
+
+(defun my-esh-scrollback-file (&optional dir)
+  (expand-file-name ".eshell-scrollback" (or dir default-directory)))
+
+(defun my-restore-scrollback* ()
+  (when (derived-mode-p 'eshell-mode)
+    (insert
+     (with-temp-buffer
+       (insert-file-contents-literally (or (bound-and-true-p my-esh-scrollback-file)
+                                           (my-esh-scrollback-file)))
+       (princ (buffer-string))))))
+
+(defun my-restore-scrollback ()
+  (when (derived-mode-p 'eshell-mode)
+    (insert-file-contents (or (bound-and-true-p my-esh-scrollback-file)
+                              (my-esh-scrollback-file)))))
+
+(defun save-eshell-scrollback* ()
+  (let* ((file (or (bound-and-true-p my-esh-scrollback-file)
+                   (my-esh-scrollback-file)))
+         (maybe (get-file-buffer file)))
+    (when maybe (kill-buffer maybe))
+    (save-mark-and-excursion
+      (let ((end (point)))
+        (eshell-previous-prompt 1)
+        (forward-line 0)
+        (let* ((beg (point))
+               (savestring (prin1-to-string (buffer-substring beg end))))
+          (with-temp-buffer
+            (insert savestring)
+            (write-region (point-min) (point-max) file
+                          'append 'silently)
+            ))))))
+
+(defun my-esh-save-scrollback ()
+  (let* ((file (or (bound-and-true-p my-esh-scrollback-file)
+                   (my-esh-scrollback-file)))
+         (maybe (get-file-buffer file)))
+    (when (f-writable-p file)
+      (when maybe (kill-buffer maybe))
+      (save-mark-and-excursion
+        (let ((end (point)))
+          (eshell-previous-prompt 1)
+          (forward-line 0)
+          (let ((beg (point)))
+            (write-region beg end file
+                          'append 'silently)))))))
+
+
+;;; More stuff
+
+(defun my-generate-eshell-name (dir)
+  (concat "*eshell " (my-fish-style-path dir 30) "*"))
+
+(defun my-esh-rename ()
+  (let ((newname (my-generate-eshell-name default-directory)))
+    (if (get-buffer newname)
+        (message "alrdy exist")
+      (rename-buffer newname))))
+
+(defun my-pkg-version (lib)
+  (require 'epl)
+  (string-join (mapcar #'number-to-string
+                       (epl-package-version (epl-package-from-file
+                                             (find-library-name lib))))
+               "."))
+
+;; Tip: installing xwininfo or xprop lets neofetch know the WM
+(defun eshell/neofetch (&rest args)
+  (eshell/wait (eshell-external-command "neofetch" args))
+  (save-mark-and-excursion
+    (eshell-previous-prompt 1)
+    (when (re-search-forward "Uptime: " nil t)
+      (forward-line 1)
+      (goto-char (line-beginning-position))
+      (insert "Emacs Uptime: ")
+      (add-text-properties
+       (line-beginning-position) (point)
+       `(face (list :foreground ,(seq-elt ansi-color-names-vector 1)
+                    :weight bold)))
+      (insert (emacs-uptime))
+      (open-line 1))
+    (forward-line)
+    (goto-char (line-beginning-position))
+    (insert "Emacs: ")
+    (add-text-properties
+     (line-beginning-position) (point)
+     `(face (list :foreground ,(seq-elt ansi-color-names-vector 1)
+                  :weight bold)))
+    (insert emacs-version)
+    (open-line 1)
+    (when (re-search-forward "Shell: " nil t)
+      (delete-region (point) (line-end-position))
+      (insert (concat "eshell " (my-pkg-version "eshell"))))
+    (when (and (bound-and-true-p exwm-state)
+               (= exwm-state 1))
+      (when (re-search-forward "WM: " nil t)
+        (delete-region (point) (line-end-position))
+        (insert (concat "Emacs X Window Manager " (my-pkg-version "exwm")))))
+    (when (re-search-forward "Terminal: " nil t)
+      (delete-region (point) (line-end-position))
+      (insert "no terminal emulation")
+      ;; (insert (concat "emacs " emacs-version))
+      )))
+
+(defun eshell/gp ()
+  (eshell-command "guix pull && guix pull --news"))
+
+
+;;;; For publishing pipeline
+
+(defun my-org-file-id (file)
+  "Quickly get the file-level id from FILE.
+For use in heavy loops; it skips activating `org-mode'.
+For all other uses, see `org-id-get'."
+  (let ((file-name-handler-alist nil))
+    (with-temp-buffer
+      (insert-file-contents-literally file nil 0 200)
+      (when (search-forward ":id: " nil t)
+        (when (= (line-number-at-pos) (line-number-at-pos (point-max)))
+          (error "Whoops, amend `my-org-file-id'"))
+        (delete-horizontal-space)
+        (buffer-substring (point) (line-end-position))))))
+
+(defun my-org-file-tags (file)
+  "Quickly get the file-tags from FILE.
+For use in heavy loops; it skips activating `org-mode'.
+For all other uses, see `org-get-tags'."
+  (let ((file-name-handler-alist nil))
+    (with-temp-buffer
+      (insert-file-contents file)
+      (let ((boundary (or (save-excursion (re-search-forward "^ *?[^#:]" nil t))
+                          (point-max))))
+        (when (search-forward "#+filetags: " boundary t)
+          (thread-first (buffer-substring (point) (line-end-position))
+                        (string-trim)
+                        (string-split ":" t)
+                        (sort #'string-lessp)))))))
+
+(defun my-uuid-to-short (uuid)
+  (let* ((hexa (string-trim (string-replace "-" "" uuid)))
+         (decimal (string-to-number hexa 16)))
+    (if (or (= 0 decimal) (/= 32 (length hexa)))
+        (error "String should be a valid UUID 36 chars long: %s" uuid)
+      (substring (my-int-to-consonants decimal 5) -5))))
+
+(defun my-int-to-consonants (integer &optional length)
+  "Convert INTEGER to a base-21 number represented as non-vowel letters."
+  (let ((result "")
+        (remainder integer))
+    (while (> remainder 0)
+      (setq result (concat (char-to-string (my-int-to-consonants-one-digit
+                                            (mod remainder 21)))
+                           result))
+      (setq remainder (/ remainder 21)))
+    (setq length (max 1 (or length 1)))
+    (if (< (length result))
+        (string-pad result length ?b t)
+      result)))
+
+(defun my-int-to-consonants-one-digit (integer)
+  "Convert INTEGER between 0 and 20 into one non-vowel letter."
+  ;; A b c d E f g h I j k l m n O p q r s t U v w x y z
+  ;; bcdfghjklmnpqrstvwxyz
+  ;; if you start counting from b, E would've been 4th char
+  (cond
+   ((< integer 3) (+ ?b integer))
+   ((< integer 6) (+ ?f integer -3))
+   ((< integer 11) (+ ?j integer -6))
+   ((< integer 16) (+ ?p integer -11))
+   ((< integer 21) (+ ?v integer -16))
+   (t (error "Input was larger than 20"))))
+
+(defvar my-ids (make-hash-table :size 4000 :test #'equal)
+  "Database for checking ID collisions.")
+
+(defun my-check-id-collisions ()
+  (cl-loop for v being the hash-values of my-ids
+           as uuids = (-distinct v)
+           when (> (length uuids) 1)
+           do (warn "These uuids make same page-id: %s" uuids)))
+
+(defun my-add-backlinks (&rest _)
+  "Add a \"What links here\" subtree at the end.
+Designed for `org-export-before-parsing-functions', where it
+will not modify the source file.
+
+Can probably be tested in a real org buffer... it never occurred
+to me to do that."
+  (let ((this-node (ignore-errors (org-roam-node-at-point)))
+        (linked-nodes nil))
+    (when this-node
+      (dolist (obj (org-roam-backlinks-get this-node :unique t))
+        (let ((node (org-roam-backlink-source-node obj)))
+          (unless (member node linked-nodes)
+            (push node linked-nodes))))
+      (dolist (obj (org-roam-reflinks-get this-node))
+        (let ((node (org-roam-reflink-source-node obj)))
+          (unless (equal node this-node)
+            (unless (member node linked-nodes)
+              (push node linked-nodes)))))
+      (when linked-nodes
+        (save-excursion
+          (if (bobp)
+              (progn
+                (goto-char (point-max))
+                (insert "\n* What links here")
+                (when (string-prefix-p "#" (org-roam-node-title this-node))
+                  (insert "\n (Sorted by recent first)")))
+            (org-insert-subheading nil)
+            (insert "What links here"))
+          ;; sort by creation: newest on top
+          (let ((sorted-nodes
+                 (--sort (string-lessp
+                          (map-elt (org-roam-node-properties other) "CREATED")
+                          (map-elt (org-roam-node-properties it) "CREATED"))
+                         linked-nodes)))
+            (dolist (node sorted-nodes)
+              (insert
+               "\n- [[id:"
+               (org-roam-node-id node)
+               "]["
+               (replace-regexp-in-string "[][]" "" (org-roam-node-title node))
+               "]]"))))))))
+
+(defun my-replace-datestamps-with-links (&rest _)
+  (when (ignore-errors (org-roam-node-at-point))
+    (save-excursion
+      (goto-char (point-min))
+      (while (re-search-forward (rx "[" (group (= 4 digit) "-" (= 2 digit) "-" (= 2 digit)) "]") nil t)
+        (let ((beg (match-beginning 0))
+              (end (match-end 0))
+              (datestamp (substring-no-properties (match-string 1))))
+          ;; check that it is not already a link
+          (unless (org-element-property :path (org-element-context))
+            ;; check that it isn't a property or comment line
+            (unless (save-excursion
+                      (goto-char (line-beginning-position))
+                      (looking-at-p "[[:space:]]*?[:#]"))
+              ;; check that a daily-page exists
+              (when-let ((daily-id (org-roam-db-query
+                                    `[:select [id]
+                                              :from nodes
+                                              :where (like title ,datestamp)])))
+                (delete-region beg end)
+                (goto-char beg)
+                (let ((fancy (format-time-string
+                              (car org-timestamp-custom-formats)
+                              (date-to-time datestamp))))
+                  (insert (concat "[[id:" (caar daily-id) "][<" fancy ">]]")))))))))))
+
+;; FIXME The first "body text" could be a #+begin_quote or #+TOC, which gets
+;; skipped too.  It could also be the beginning of a :drawer:.
+(defvar my-org-text-line-re "^[ \t]*[^#:\n]"
+  "Regexp to match a line that isn't a comment, a keyword or a property drawer.
+Useful for jumping past a file's front matter.")
+
+(defun my-add-refs-as-paragraphs (&rest _)
+  "Print out the roam-ref under each heading that has one."
+  (save-excursion
+    (goto-char (point-min))
+    (when (re-search-forward my-org-text-line-re nil t)
+      ;; Workaround inexact regexp
+      (forward-line -1)
+      (unless (or (looking-at-p "#\\+toc") (looking-at-p "#\\+begin_"))
+        (forward-line 1))
+      (open-line 2)
+      (while (progn
+               (when-let ((refs (org-entry-get nil "roam_refs")))
+                 (while (progn
+                          (forward-line 1)
+                          (or (looking-at-p "^[ \t]*:") (eobp))))
+                 (insert "\n(" refs ")\n\n"))
+               (outline-next-heading)
+               (not (eobp)))))))
+
+(defun my-ensure-section-containers (&rest _)
+  "Like setting `org-html-container-element' to \"section\",
+but apply to all subheadings, not only the top level."
+  (save-excursion
+    (goto-char (point-min))
+    (when (re-search-forward org-element-headline-re nil t)
+      (while (not (eobp))
+        (org-entry-put nil "HTML_CONTAINER" "section")
+        (outline-next-heading)))))
+
+(let ((rx (rx (? "@") "^{" (= 13 digit) "}")))
+  (defun my-strip-inline-anki-ids (&rest _)
+    "Clean the little inline-anki superscript numbers."
+    (save-excursion
+      (while (re-search-forward rx nil t)
+        (replace-match "")))))
+
+(defun my-strip-hash-if-matches-base (link)
+  "Remove the hash-part of the link (i.e. the bit after the #
+character in domain.com/PAGE-ID/slug#HEADING-ID) if the HEADING-ID
+matches PAGE-ID anyway (i.e. it's a file-level id)"
+  (let* ((splits (split-string link "#"))
+         (base (car splits))
+         (hash (cadr splits)))
+    (if (and hash (string-search hash base))
+        base
+      link)))
+
+(defun my-generate-todo-log (path)
+  "Generate a new Org file showcasing recent completed TODOs."
+  (let ((org-agenda-span 'fortnight)
+        (org-agenda-prefix-format
+         '((agenda . " %i %?-12t") (todo . "") (tags . "") (search . "")))
+        (org-agenda-show-inherited-tags nil))
+    (org-agenda-list)
+    (org-agenda-log-mode)
+    (org-agenda-archives-mode)
+    (shell-command "rm /tmp/roam/todo-log-now.html")
+    (org-agenda-write "/tmp/roam/todo-log-now.html")
+    (org-agenda-earlier 1)
+    (shell-command "rm /tmp/roam/todo-log-last-week.html")
+    (org-agenda-write "/tmp/roam/todo-log-last-week.html")
+    (org-agenda-quit)
+    (find-file path)
+    ;; with-current-buffer (or (find-buffer-visiting path)
+    ;;                         )
+    (delete-region (point-min) (point-max))
+    (insert ":PROPERTIES:"
+            "\n:ID: e4c5ea8b-5b06-43c4-8948-3bfe84e8d5e8"
+            "\n:CREATED:  " (format-time-string "[%F]")
+            "\n:END:"
+            "\n#+title: Completed tasks"
+            "\n#+filetags: :fren:"
+            "\n#+date: "
+            "\n#+begin_export html"
+            "\n")
+    (insert-file-contents "/tmp/roam/todo-log-last-week.html")
+    (delete-region (point) (search-forward "<pre>"))
+    (insert "<pre class=\"agenda\">")
+    (forward-line)
+    (delete-region (1- (line-beginning-position)) (line-end-position))
+    (search-forward "</pre>")
+    (delete-region (1- (line-beginning-position)) (point-max))
+    (insert-file-contents "/tmp/roam/todo-log-now.html")
+    (delete-region (point) (search-forward "<pre>"))
+    (forward-line)
+    (delete-region (1- (line-beginning-position)) (line-end-position))
+    (delete-region (search-forward "</pre>") (point-max))
+    (insert "\n#+end_export")
+    ;; remove special face for today (css .org-agenda-date-weekend-today)
+    (goto-char (point-min))
+    (search-forward "-today")
+    (replace-match "")
+    (save-buffer)
+    (kill-buffer))
+  (view-echo-area-messages))
+
+(defun my-compile-atom-feed (path entries-dir)
+  (when (file-exists-p path)
+    (move-file-to-trash path))
+  (with-temp-file path
+    (insert "<?xml version=\"1.0\" encoding=\"utf-8\"?>
+<feed xmlns=\"http://www.w3.org/2005/Atom\">
+<title>Martin Edström</title>
+<link href=\"https://edstrom.dev\"/>
+<updated>" (format-time-string "%FT%TZ") "</updated>
+<author><name>Martin Edström</name></author>
+<rights> © 2023-" (format-time-string "%Y") " Martin Edström </rights>
+<id>https://edstrom.dev</id>")
+    (dolist (entry (directory-files entries-dir t "^[^\\.]"))
+      (insert-file-contents entry))
+    (goto-char (point-max))
+    (insert "
+</feed>")))
+
+(defun my-make-atom-entry (post uuid)
+  (let-alist (kvplist->alist post)
+    (let ((content-for-feed
+           (with-temp-buffer
+             (buffer-disable-undo)
+             (insert .content)
+             (goto-char (point-min))
+             ;; De-linkify links to non-public URLs
+             (let* ((forbidden (regexp-opt (append my-tags-to-avoid-uploading
+                                                   my-tags-for-hiding)))
+                    (re (rx "<a " (*? nonl) "class=\"" (*? nonl)
+                            (regexp forbidden)
+                            (*? nonl) ">" (group (*? anychar)) "</a>")))
+               (while (re-search-forward re nil t)
+                 (replace-match (match-string 1)))
+               (buffer-string)))))
+      (concat
+       "\n<entry>"
+       "\n<title>" .title "</title>"
+       "\n<link href=\"" "https://edstrom.dev/" .pageid "/" .slug "\" />"
+       "\n<id>urn:uuid:" uuid "</id>"
+       "\n<published>" .created "T12:00:00Z</published>"
+       (if .updated
+           (concat "\n<updated>" .updated "T12:00:00Z</updated>")
+         "")
+       ;; With type="xhtml", we don't have to entity-escape unicode
+       ;; (https://validator.w3.org/feed/docs/atom.html#text)
+       "\n<content type=\"xhtml\">"
+       "\n<div xmlns=\"http://www.w3.org/1999/xhtml\">\n"
+       content-for-feed
+       "\n</div>"
+       "\n</content>"
+       "\n</entry>"))))
+
+
+;;;; Unprefixed
+
+;; upstream soemthing like this?
+(defmacro time (&rest body)
+  "Evaluate BODY and print time elapsed as a message.
+Then return the last value of BODY."
+  (let ((T (cl-gensym)))
+    `(let ((,T (current-time)))
+       (prog1 (progn ,@body)
+         (message "Elapsed: %fs" (float-time (time-since ,T)))))))
+
+(defmacro me/measure-time (&rest body)
+  "Evaluate BODY and return time elapsed."
+  (let ((T (cl-gensym)))
+    `(let ((,T (current-time)))
+       ,@body
+       (float-time (time-since ,T)))))
+
+(defun lines (&rest strings)
+  "Like `concat', but intersperse newlines between the STRINGS.
+This allows typing the following, which plays well with
+indentation.
+
+(lines \"foo\"
+       \"bar\"
+       \"baz\")"
+  (string-join strings "\n"))
+
+;; Preserved because it was a Lisp lesson to me
+(defun ^ (x power)
+  (apply #'* (make-list power x)))
+
+(defun cut-at (CUTOFF STRING)
+  "Variant of `substring'.
+Always cuts from the start. Permits the CUTOFF to exceed the
+length of the string, in which case the string is returned
+unaltered with no complaints."
+  (if (< (length STRING) CUTOFF)
+      STRING
+    (substring STRING 0 CUTOFF)))
+
+;; Lifted from Doom
+(unless (boundp 'doom-version)
+  (defmacro quiet! (&rest forms)
+    "Run FORMS without generating any output.
+
+This silences calls to `message', `load', `write-region' and anything that
+writes to `standard-output'. In interactive sessions this inhibits output to the
+echo-area, but not to *Messages*."
+    `(if init-file-debug
+         (progn ,@forms)
+       ,(if noninteractive
+            `(letf! ((standard-output (lambda (&rest _)))
+                     (defun message (&rest _))
+                     (defun load (file &optional noerror nomessage nosuffix must-suffix)
+                       (funcall load file noerror t nosuffix must-suffix))
+                     (defun write-region (start end filename &optional append visit lockname mustbenew)
+                       (unless visit (setq visit 'no-message))
+                       (funcall write-region start end filename append visit lockname mustbenew)))
+                    ,@forms)
+          `(let ((inhibit-message t)
+                 (save-silently t))
+             (prog1 ,@forms (message "")))))))
+
+(unless (boundp 'doom-version)
+  (defmacro after! (package &rest body)
+    "Evaluate BODY after PACKAGE have loaded.
+
+PACKAGE is a symbol or list of them. These are package names, not modes,
+functions or variables. It can be:
+
+- An unquoted package symbol (the name of a package)
+    (after! helm BODY...)
+- An unquoted list of package symbols (i.e. BODY is evaluated once both magit
+  and git-gutter have loaded)
+    (after! (magit git-gutter) BODY...)
+- An unquoted, nested list of compound package lists, using any combination of
+  :or/:any and :and/:all
+    (after! (:or package-a package-b ...)  BODY...)
+    (after! (:and package-a package-b ...) BODY...)
+    (after! (:and package-a (:or package-b package-c) ...) BODY...)
+  Without :or/:any/:and/:all, :and/:all are implied.
+
+This is a wrapper around `eval-after-load' that:
+
+1. Suppresses warnings for disabled packages at compile-time
+2. No-ops for package that are disabled by the user (via `package!')
+3. Supports compound package statements (see below)
+4. Prevents eager expansion pulling in autoloaded macros all at once"
+    (declare (indent defun) (debug t))
+    (if (symbolp package)
+        (list (if (or (not (bound-and-true-p byte-compile-current-file))
+                      (require package nil 'noerror))
+                  #'progn
+                #'with-no-warnings)
+              (let ((body (macroexp-progn body)))
+                `(if (featurep ',package)
+                     ,body
+                   ;; We intentionally avoid `with-eval-after-load' to prevent
+                   ;; eager macro expansion from pulling (or failing to pull) in
+                   ;; autoloaded macros/packages.
+                   (eval-after-load ',package ',body))))
+      (let ((p (car package)))
+        (cond ((not (keywordp p))
+               `(after! (:and ,@package) ,@body))
+              ((memq p '(:or :any))
+               (macroexp-progn
+                (cl-loop for next in (cdr package)
+                         collect `(after! ,next ,@body))))
+              ((memq p '(:and :all))
+               (dolist (next (cdr package))
+                 (setq body `((after! ,next ,@body))))
+               (car body)))))))
+
+;; Just an old habit from typing "date" at the terminal. It's how I check the
+;; current time, which I do so rarely I can't be bothered to set a hotkey, nor
+;; will I clutter the modeline with a clock. M-x date it is.
+(defun date ()
+  (interactive)
+  (message (format-time-string "%F %T %Z (%z) (%A)")))

@@ -1,15 +1,6 @@
-.eshell-*
-*.swp
-*~
-*#
-*.bak
+/elpaca/
+/eln-cache/
+/private.el
 
-/*-priv*.el
-/package.json
-/package-lock.json
-/node_modules/
-/mothball/
-/wip/
-/subed/
-/mail/
-/elfeed/
+*.elc
+.eshell-*
