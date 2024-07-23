@@ -50,6 +50,8 @@
 
 (defvar me/okay-themes-day
   '(doom-flatwhite
+    ef-cyprus
+    ef-arbutus
     ef-day))
 
 (defvar me/okay-themes-night
@@ -137,3 +139,12 @@ selections are taken from `me/okay-themes-day' in the day and
   (mapc #'disable-theme custom-enabled-themes)
   (load-theme (intern-soft theme))
   (run-hooks 'me/load-theme-hook))
+
+
+;; Bonus snippet!  When interactively selecting a theme with `me/load-theme',
+;; then (assuming C-l is `embark-act') typing C-; C-m will load the theme at
+;; point without exiting the minibuffer, so you can just go try another theme.
+
+;; (setq embark-quit-after-action
+;;       '((me/load-theme . nil)
+;;         (t . t)))

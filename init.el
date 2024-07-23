@@ -49,22 +49,44 @@
   ;; Make the :ensure keyword call Elpaca
   (elpaca-use-package-mode))
 
-;; Needed during init
+;; Require packages needed during init
 (use-package no-littering)
-(use-package compat) ;; to compile lib.el
-(use-package crux) ;; to compile lib.el
-(use-package dash) ;; to compile lib.el
-(use-package named-timer)
+(use-package compat)
+(elpaca-wait)
 (use-package defrepeater)
+(use-package crux) 
+(use-package dash) 
 (elpaca-wait)
 
-(setq custom-file (concat user-emacs-directory "custom.el"))
+;; Ensure the initial frame is dark even if it hasn't my real theme
 (setq custom-safe-themes t)
-(set-frame-parameter nil 'alpha-background 82)
 (load-theme 'wombat)
 
 
-;;;; Prep a progressive preload to run afterwards
+;;;; Load my code
+
+(unwind-protect
+    (let ((.emacs.d user-emacs-directory))
+      (load (concat .emacs.d "lib.el"))
+      (dolist (file (directory-files (concat .emacs.d "semi-packaged/")
+                                     t "^\\w.*el$"))
+        (load file))
+      (load (concat .emacs.d "private.el"))
+      (load (concat .emacs.d "late-init.el"))
+      (load (setq custom-file (concat .emacs.d "custom.el"))))
+  ;; Undo overrides from early-init.el
+  (add-hook 'elpaca-after-init-hook
+            (lambda ()
+              (message "Init took %.2fs, post-init took %.2fs "
+                       (float-time (time-subtract after-init-time
+                                                  before-init-time))
+                       (float-time (time-since after-init-time)))
+              (setq file-name-handler-alist me/original-fnha)
+              (setq gc-cons-threshold 800000))
+            99))
+
+
+;;;; Preload lazy pkgs
 
 (add-hook 'elpaca-after-init-hook
           (lambda () (run-with-idle-timer 2 nil #'me/progressive-preload)))
@@ -80,16 +102,6 @@
       (run-with-idle-timer 2 nil #'me/progressive-preload)
     (message "Preloading... done")))
 
-;; (advice-add 'use-package :after
-;;             (lambda (package-name &rest _)
-;;               (push package-name me/progressive-preload-queue)))
-
-;; (advice-add 'elpaca :after
-;;             (lambda (&rest args)
-;;               (when (symbolp (car args))
-;;                 (push (car args) me/progressive-preload-queue))))
-
-;; Pre-fill with some builtins
 (defvar me/progressive-preload-queue
   '(dired
     org
@@ -116,53 +128,8 @@
     em-unix
     em-xtra))
 
-
-;;;; Load
-
-(defmacro me/load-newest-ensure-compiled (path)
-  `(let* ((el (concat (string-remove-suffix ".el" ,path) ".el"))
-          (elc (concat el "c")))
-     (when (file-newer-than-file-p el elc)
-       (byte-compile-file el))
-     (load elc)))
-
-(defvar me/elapsed-gc-after-init nil)
-(defvar me/time-at-init-done nil)
-
-(unwind-protect
-    (let ((.emacs.d user-emacs-directory))
-      ;; Compile a personal library of defuns.  The rest of init is just a
-      ;; program that sets hooks to (compiled) functions and turns (compiled)
-      ;; modes on.  Compiling that program would be all footgun and no speedup.
-      (me/load-newest-ensure-compiled (concat .emacs.d "lib"))
-      ;; Compile these too as QC
-      (dolist (file (directory-files (concat .emacs.d "semi-packaged/")
-                                     t "^\\w.*el$"))
-        (me/load-newest-ensure-compiled file))
-      (load (concat .emacs.d "private"))
-      (load (concat .emacs.d "late-init")))
-  ;; Undo overrides from early-init.el
-  (setq file-name-handler-alist me/original-fnha)
-  (setq load-prefer-newer t)
-  (setq-default coding-system-for-read nil)
-  (setq-default coding-system-for-write nil)
-  (setq me/elapsed-gc-after-init (me/measure-time (garbage-collect)))
-  (setq me/time-at-init-done (current-time))
-  (add-hook 'elpaca-after-init-hook
-            (lambda ()
-              (let ((post-init-gc (me/measure-time (garbage-collect))))
-                (message "Init took %.2fs (GC %.2fs), post-init took %.2fs (GC %.2fs)"
-                         (float-time (time-subtract after-init-time
-                                                    before-init-time))
-                         me/elapsed-gc-after-init
-                         (float-time (time-since me/time-at-init-done))
-                         post-init-gc))
-              (setq gc-cons-threshold 800000))
-            99))
-
 ;; Local Variables:
 ;; no-byte-compile: t
 ;; no-native-compile: t
 ;; no-update-autoloads: t
 ;; End:
-(put 'list-timers 'disabled nil)

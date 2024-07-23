@@ -1,29 +1,31 @@
 ;; -*- lexical-binding: t; -*-
 
-;; TODO Doom's autorevert behavior is a dream, adopt it (for dired too)
-
+;; Even though I step through the buffer of the file of code, I shall fear no
+;; spaghetti, for Emacs is with me; Your lisp and Your documentation, they
+;; comfort me.
 
+
 ;;;; Packages
 
 ;; Pkg dev libs
+(elpaca (unpackaged :repo "https://github.com/alphapapa/unpackaged.el"))
+(elpaca flycheck-package)
 (elpaca help-find)
+(elpaca htmlize)
 (elpaca keymap-utils) ;; prefix kmu-*
 (elpaca kv)
-(elpaca htmlize)
-(elpaca ts)
-(elpaca persist)
-(elpaca (unpackaged :repo "https://github.com/alphapapa/unpackaged.el"))
 (elpaca package-lint)
-(elpaca flycheck-package)
+(elpaca persist)
+(elpaca ts)
 
 ;; Untried
-(elpaca dogears)
-(elpaca drag-stuff)
 (elpaca (casual-avy :repo "https://github.com/kickingvegas/casual-avy"))
 (elpaca (casual-dired :repo "https://github.com/kickingvegas/casual-dired"))
+(elpaca (combobulate :repo "https://github.com/mickeynp/combobulate"))
+(elpaca dogears)
+(elpaca drag-stuff)
 (elpaca tree-sitter)
 (elpaca tree-sitter-langs)
-(elpaca (combobulate :repo "https://github.com/mickeynp/combobulate"))
 
 ;; The rest
 (elpaca (ess-rproj :repo "https://github.com/chainsawriot/ess-rproj"))
@@ -35,7 +37,6 @@
 (elpaca ef-themes)
 (elpaca git-timemachine)
 (elpaca hacker-typer)
-(elpaca iscroll)
 (elpaca multiple-cursors)
 (elpaca mw-thesaurus)
 (elpaca org-download)
@@ -59,7 +60,6 @@
 ;; (elpaca bui)
 ;; (elpaca buttercup)
 ;; (elpaca chatgpt-shell)
-;; (elpaca circadian)
 ;; (elpaca consult-org-roam)
 ;; (elpaca copilot)
 ;; (elpaca copy-as-format)
@@ -104,7 +104,6 @@
 ;; (elpaca vimgolf)
 ;; (elpaca visual-regexp)
 
-
 
 ;;; Backups
 (setopt
@@ -132,7 +131,6 @@
                "/home/kept/emacs/twee-mode/"))
   (add-to-list 'load-path dir))
 
-
 ;; Set up booleans I can use here and there throughout init.
 (defvar os-debian (executable-find "apt-get"))
 (defvar os-arch (or (string-search "arch" operating-system-release)
@@ -155,17 +153,15 @@
 ;; (add-to-list 'initial-frame-alist '(fullscreen . fullboth))
 (add-to-list 'initial-frame-alist '(fullscreen . maximized))
 ;; (add-to-list 'default-frame-alist '(alpha-background . 30))
-
+;; (set-frame-parameter nil 'alpha-background 82)
 
 
 ;;; Font
-;; Do not delete comments
 
 (set-face-font 'default (font-spec :family "Iosevka Nerd Font" :size 33))
 
 ;; For my Surface Pro screen (2736x1824).  Here are the respective fonts'
-;; maximum size that still let you split the screen into two 80-column panes.
-;; ASSUMING NO DPI SCALING.
+;; maximum size that still let me split the screen into two 80-column panes.
 ;;
 ;; FONTS THAT SUPPORT LIGATURES https://wiki.archlinux.org/title/Font#Monospaced
 ;; (setq doom-font (font-spec :family "Iosevka Nerd Font" :size 32))
@@ -175,9 +171,6 @@
 ;; (setq doom-font (font-spec :family "Lilex Nerd Font" :size 27))
 ;; (setq doom-font (font-spec :family "CaskaydiaCove Nerd Font" :size 28))
 ;; (setq doom-font (font-spec :family "FiraCode Nerd Font" :size 26))
-
-;; The default is Symbola, but I can't find it on pacman repos.
-;; (setq doom-unicode-font doom-font) ;; if it has good unicode coverage alrdy
 
 
 ;;; Debugging
@@ -193,118 +186,118 @@
 
 ;;;; Builtin
 
-;; Ugh, the "emacs" "package".  Never liked this paradigm, but adopted it after
-;; I learned you can use M-x `use-package-report' to profile each package.
-(use-package emacs :ensure nil :config
-  (fset #'display-startup-echo-area-message #'ignore)
-  (setq inhibit-startup-screen t)
-  (recentf-mode)
-  (savehist-mode)
-  (save-place-mode)
-  (column-number-mode)
-  (display-battery-mode)
-  (delete-selection-mode)
-  (pixel-scroll-precision-mode)
+(fset #'display-startup-echo-area-message #'ignore)
+(setq inhibit-startup-screen t)
+(recentf-mode)
+(savehist-mode)
+(save-place-mode)
+(column-number-mode)
+(display-battery-mode)
+(delete-selection-mode)
+(pixel-scroll-precision-mode)
 
-  (add-hook 'emacs-lisp-mode-hook #'outline-minor-mode)
-  (add-hook 'help-mode-hook #'visual-line-mode)
-  (add-hook 'prog-mode-hook (lambda () (setq truncate-lines t)))
-  (add-hook 'text-mode-hook #'visual-line-mode)
-  (add-hook 'after-save-hook #'executable-make-buffer-file-executable-if-script-p)
+(add-hook 'emacs-lisp-mode-hook #'outline-minor-mode)
+(add-hook 'help-mode-hook #'visual-line-mode)
+(add-hook 'prog-mode-hook (lambda () (setq truncate-lines t)))
+(add-hook 'text-mode-hook #'visual-line-mode)
+(add-hook 'after-save-hook #'executable-make-buffer-file-executable-if-script-p)
 
-  ;; For `consult-outline' in elisp buffers
-  (me/unihook emacs-lisp-mode-hook
-    (setq-local outline-regexp
-                (if (string-search user-emacs-directory default-directory)
-                    ";;;;*[^#]\\|(use-package "
-                  ";;;;*")))
-  
-  ;; Configure `hippie-expand'
-  (add-hook 'special-mode-hook #'my-hippie-config)
-  (add-hook 'prog-mode-hook #'my-hippie-config)
-  (add-hook 'text-mode-hook #'my-hippie-config)
-  
-  ;; Perf (especially Org)
-  (global-auto-composition-mode 0)
-  (setq bidi-display-reordering nil)
+;; For `consult-outline' in elisp buffers
+(me/unihook emacs-lisp-mode-hook
+  (setq-local outline-regexp
+              (if (string-search user-emacs-directory default-directory)
+                  ";;;;*[^#]\\|(use-package "
+                ";;;;*")))
 
-  ;; Catch mistakes in my elisp on save
-  ;; (add-hook 'after-save-hook #'my-compile-and-drop)
+;; Configure `hippie-expand'
+(add-hook 'special-mode-hook #'my-hippie-config)
+(add-hook 'prog-mode-hook #'my-hippie-config)
+(add-hook 'text-mode-hook #'my-hippie-config)
 
-  ;; Prevent accidental edits (easy to miss on files like this)
-  (add-hook 'so-long-mode-hook #'read-only-mode)
-  
-  ;; (auto-save-visited-mode) ;; NOTE see undoom.el
-  ;; (context-menu-mode)
-  ;; (repeat-mode)
+;; Perf (especially Org)
+(global-auto-composition-mode 0)
+(setq bidi-display-reordering nil)
 
-  ;; Limit scrollback because gcc and R can spit out enough to slow my system.
-  ;; Good values:
-  ;; 2^12 on Latitude E7250.
-  ;; 2^10 on Thinkpad X200.
-  (setq comint-buffer-maximum-size (^ 2 10))
-  (add-hook 'comint-output-filter-functions
-            #'my-truncate-buffer-and-move-excess)
+;; Catch mistakes in my elisp on save
+;; (add-hook 'after-save-hook #'my-compile-and-drop)
 
-  ;; for ess it would be useful to autoscroll the R console when sending
-  ;; expressions from an R file. Maybe not great while I'm inside a shell buffer
-  ;; or other comint buffer directly
-  (setq comint-scroll-to-bottom-on-input t)
+;; Prevent accidental edits (easy to miss on files like this)
+(add-hook 'so-long-mode-hook #'read-only-mode)
 
-  (setq savehist-additional-variables '(kill-ring
-                                        register-alist
-                                        mark-ring global-mark-ring
-                                        search-ring regexp-search-ring))
+;; (auto-save-visited-mode) ;; NOTE see undoom.el
+;; (context-menu-mode)
+;; (repeat-mode)
 
-  (setq mode-line-percent-position nil)
-  (setq mode-line-modes nil)
-  (setq undo-limit (* 16 1000 1000)) ;; 16 MB, not default 160 kB
-  (setq undo-strong-limit (* 24 1000 1000))
-  (setq ring-bell-function #'ignore)
-  (setq gnus-select-method '(nntp "news.eternal-september.org"))
-  (setq byte-compile-warnings '(not free-vars))
-  (setq kill-whole-line t) ;; TIL after 9 years of emacs
-  (setq vc-follow-symlinks t)
-  (setq auth-sources '("~/.authinfo")) ;; https://magit.vc/manual/ghub/Storing-a-Token.html
-  (setq shr-max-image-proportion 0.5)
-  (setq mouse-yank-at-point t)
-  (setq save-interprogram-paste-before-kill t)
-  (setq select-enable-primary t)
-  (setq enable-local-variables :all)
-  (setq custom-safe-themes t)
-  (setq message-log-max 8000)
-  (setq kill-read-only-ok t)
-  (setq kill-ring-max 600)
-  (setq-default enable-recursive-minibuffers t)
-  (setq-default fill-column 79)
-  (setq view-read-only t)
-  (setq-default indent-tabs-mode nil)
-  (setq debug-on-error t)
-  (setq vc-msg-copy-id-to-kill-ring nil)
-  (setq mouse-drag-and-drop-region-cross-program t) ;; no effect on wayland?
-  (setq show-paren-context-when-offscreen t)
-  (setq help-enable-variable-value-editing t)
-  (setq proced-enable-color-flag t)
-  (setq abbrev-suggest t)
-  (setq use-short-answers t)
-  ;; (setq eval-expression-print-length 64)
-  ;; (setq eval-expression-print-level 16)
+;; Limit scrollback because gcc and R can spit out enough to slow my system.
+;; Good values:
+;; 2^12 on Latitude E7250.
+;; 2^10 on Thinkpad X200.
+(setq comint-buffer-maximum-size (^ 2 10))
+(add-hook 'comint-output-filter-functions
+          #'my-truncate-buffer-and-move-excess)
 
-  ;; Don't clear my echo area
-  (setq garbage-collection-messages nil)
-  (setq auto-save-no-message t)
-  (setq suggest-key-bindings nil) ;; prefer to show command's return value
+;; for ess it would be useful to autoscroll the R console when sending
+;; expressions from an R file. Maybe not great while I'm inside a shell buffer
+;; or other comint buffer directly
+(setq comint-scroll-to-bottom-on-input t)
 
-  ;; Browse with Firefox or EWW depending on the link
-  (setq browse-url-generic-program "firefox")
-  (setq browse-url-handlers
-        '(;;("github.com" . browse-url-generic)
-          ("melpa.org" . browse-url-generic)
-          ("fanfiction.net" . browse-url-generic)
-          ;; Default
-          ("." . eww-browse-url)))
-  )
+(setq savehist-additional-variables '(kill-ring
+                                      register-alist
+                                      mark-ring global-mark-ring
+                                      search-ring regexp-search-ring))
 
+(setq mode-line-percent-position nil)
+(setq mode-line-modes nil)
+(setq undo-limit (* 16 1000 1000)) ;; 16 MB, not default 160 kB
+(setq undo-strong-limit (* 24 1000 1000))
+(setq ring-bell-function #'ignore)
+(setq gnus-select-method '(nntp "news.eternal-september.org"))
+(setq byte-compile-warnings '(not free-vars))
+(setq kill-whole-line t) ;; TIL after 9 years of emacs
+(setq vc-follow-symlinks t)
+(setq auth-sources '("~/.authinfo")) ;; https://magit.vc/manual/ghub/Storing-a-Token.html
+(setq shr-max-image-proportion 0.5)
+(setq mouse-yank-at-point t)
+(setq recentf-max-saved-items 1000)
+(setq save-interprogram-paste-before-kill t)
+(setq select-enable-primary t)
+(setq enable-local-variables :all)
+(setq custom-safe-themes t)
+(setq message-log-max 8000)
+(setq disabled-command-function nil) ;; BUG: clutters init.el not custom.el
+(setq kill-read-only-ok t)
+(setq kill-ring-max 600)
+(setq-default mode-line-format (delete '(vc-mode vc-mode) mode-line-format))
+(setq-default enable-recursive-minibuffers t)
+(setq-default fill-column 79)
+(setq-default indent-tabs-mode nil)
+(setq view-read-only t)
+(setq debug-on-error t)
+(setq vc-msg-copy-id-to-kill-ring nil)
+(setq mouse-drag-and-drop-region-cross-program t) ;; no effect on wayland?
+(setq show-paren-context-when-offscreen t)
+(setq help-enable-variable-value-editing t)
+(setq proced-enable-color-flag t)
+(setq abbrev-suggest t)
+(setq use-short-answers t)
+;; (setq eval-expression-print-length 64)
+;; (setq eval-expression-print-level 16)
+
+;; Don't clear my echo area
+(setq garbage-collection-messages nil)
+(setq auto-save-no-message t)
+(setq suggest-key-bindings nil) ;; prefer to show command's return value
+
+;; Browse with Firefox or EWW depending on the link
+(setq browse-url-generic-program "firefox")
+(setq browse-url-handlers
+      '(;;("github.com" . browse-url-generic)
+        ("melpa.org" . browse-url-generic)
+        ("fanfiction.net" . browse-url-generic)
+        ;; Default
+        ("." . eww-browse-url)))
+
+
 ;;;; Keys cleanup
 
 ;; Commands on 'too good' locations (risk that I get used to them).
@@ -344,28 +337,11 @@
 (keymap-unset global-map "<XF86Back>" t) ;; previous-buffer
 (keymap-unset global-map "<XF86Forward>" t) ;; next-buffer
 
-;; (Nice commands I discovered)
-;; "C-]" ;; abort-recursive-edit
-;; C-x i ;; insert-file
-
-;; Unbinding these has all kinds of consequences, why I'll migrate to Super one
-;; day and deprecate Control
-;;
-;; (general-unbind "C-g") ;; keyboard-quit
-;; (general-unbind "C-j") ;; newline
-;; (general-unbind "C-i")
-;; (general-unbind "C-]")
-;; (general-unbind "C-m")
-
-;; these unbindings hurt too much until I have more modal editing (deianira)
-;; (general-unbind "<f1>")
-;; (general-unbind "<down>")
-;; (general-unbind "<left>")
-;; (general-unbind "<next>")
-;; (general-unbind "<prior>")
-;; (general-unbind "<right>")
-;; (general-unbind "<up>")
-;; (general-unbind "<return>")
+;; Temporary unsets as training
+(keymap-unset global-map "C-s" t)
+(keymap-unset global-map "C-r" t)
+(keymap-unset global-map "M-%" t)
+(keymap-unset global-map "C-M-%" t)
 
 (when (boundp 'doom-version)
   (keymap-unset global-map "C-'" t) ;; imenu
@@ -447,16 +423,7 @@
 
 ;;;; Keys
 
-;;; Temporary unsets as training
-
-(keymap-unset global-map "C-s")
-(keymap-unset global-map "C-r")
-(keymap-unset global-map "M-%")
-(keymap-unset global-map "C-M-%")
-
-
-;;; Create minor mode maps for modes that lack them
-
+;; Create minor mode maps for modes that lack them
 (defvar-keymap my-abbrev-minor-mode-map)
 (add-to-list 'minor-mode-map-alist (cons 'abbrev-mode my-abbrev-minor-mode-map))
 
@@ -749,9 +716,8 @@
   ;; Dired's useless keys: h, 1234567890
   )
 
-;; (after! which-key
-;;   (keymap-set which-key-mode-map "DEL" #'which-key-undo-key))
-
+(after! which-key
+  (keymap-set which-key-mode-map "DEL" #'which-key-undo-key))
 
 
 ;;; Civilize C-g
@@ -776,9 +742,7 @@
 
 
 
-;;; More repeaters! Repeaters are love and life.
-
-;; https://tildegit.org/acdw/define-repeat-map.el
+;;; More repeaters!
 
 ;; (define-repeat-map my-buffer-thumbing
 ;;   ("<right>"   next-buffer
@@ -803,16 +767,16 @@
 ;;           upcase-dwim
 ;;           capitalize-dwim))
 
-;; mc/ commands have some magic to avoid asking about re-running themselves
-;; once for all cursors ... We need to apply the magic to the repeating version
-;; of the command as well.  I considered using define-repeat-map, but it does
-;; not make sense to me to bind every mc/ variant inside the same repeat-map.
-;; I want just the single one to become repeatable, although the correct
-;; response in this sort of situation is to just remember the `repeat' command.
-;; But correct for who? If I want to type <f3> m n n n n n n n n instead of
-;; using repeat, there should bloody well be some convenient elisp to allow it.
-;; And this is the convenient elisp, it just does not work for self-aware
-;; commands.
+;; TODO: mc/ commands have some magic to avoid asking about re-running
+;; themselves once for all cursors ... We need to apply the magic to the
+;; repeating version of the command as well.  I considered using
+;; define-repeat-map, but it does not make sense to me to bind every mc/
+;; variant inside the same repeat-map.  I want just the single one to become
+;; repeatable, although the correct response in this sort of situation is to
+;; just remember the `repeat' command.  But correct for who? If I want to type
+;; <f3> m n n n n n n n n instead of using repeat, there should bloody well be
+;; some convenient elisp to allow it.  And this is the convenient elisp, it
+;; just does not work for self-aware commands.
 
 ;; (define-key global-map [remap mc/mark-next-like-this] (defrepeater #'mc/mark-next-like-this))
 ;; (define-key global-map [remap mc/mark-previous-like-this] (defrepeater #'mc/mark-previous-like-this))
@@ -823,31 +787,12 @@
 ;; Let me type a digit such as 5 after a `repeat' to repeat another 5 times.
 (advice-add #'repeat :after #'my-enable-post-repeat-transient-map)
 
-
-;;; Smartparens.  Oh boy, I miss paredit.
-
-
-
-;; Use the key physically labelled "Caps Lock" as my new M-x.
-;; TIP: it also unlocks the comfy combo M-<menu>.
-(when (eq 'window-system 'x)
-  (my-exec "setxkbmap" "-option" "caps:menu" "altwin:menu_super"))
-(keymap-set global-map "<menu>" #'execute-extended-command)
-;; (keymap-set global-map "M-<menu>" #'embark-act)
-(after! general
-  ;; dafuq is this set for? maybe i want bind sth else on M-x?
-  (general-unbind general-override-mode-map "M-x")
-  (general-unbind general-override-mode-map "A-x")
-  ;; guess I should take a page from their book
-  (general-def general-override-mode-map "<menu>" #'execute-extended-command))
-
-(my-normie:abnormalize) ;; (see *lib.el)
-
+(my-normie:abnormalize)
 
 
 ;;;; Completion
 
-;; wishlist
+;; Wishlist
 
 ;; - Some commands should not sort by length but alphabetic. e.g. M-x recentf
 ;;   (not that I use that one).  how to config such thing?
@@ -855,7 +800,6 @@
 ;; - Marginalia annotations go off-screen when one of the files have long name
 ;;   (especially when you use vertico-buffer-mode so you only get half screen
 ;;   width).  How to fix?
-
 
 (use-package apheleia
   :config
@@ -867,8 +811,11 @@
   :config
   (dired-async-mode))
 
-(use-package asyncloop :ensure (:repo "https://github.com/meedstrom/asyncloop"))
+(use-package asyncloop
+  :ensure (:repo "https://github.com/meedstrom/asyncloop")
+  :defer)
 
+;; TODO Get Doom's autorevert behavior for dired too
 (use-package autorevert
   :ensure nil
   :init
@@ -1009,7 +956,6 @@
   (setq dired-listing-switches "-ahl -v --group-directories-first")
   (setq global-auto-revert-non-file-buffers t)
   :config
-  (dired-hist-mode)
   (require 'dired-x)
   (setq dired-omit-verbose nil)
   (setq dired-clean-confirm-killing-deleted-buffers nil)
@@ -1041,7 +987,7 @@
 (use-package eager-state
   :ensure (:repo "https://github.com/meedstrom/eager-state")
   :config
-  (eager-state-preempt-kill-emacs-hook-mode)
+  ;; (eager-state-preempt-kill-emacs-hook-mode)
   ;; (advice-add #'kill-emacs :before (lambda (&rest _) (setq kill-emacs-hook nil)))
   )
 
@@ -1070,7 +1016,11 @@
   (elfeed-org))
 
 (use-package embark
-  :defer)
+  :defer
+  :init
+  (setq embark-quit-after-action
+        '((me/load-theme . nil)
+          (t . t))))
 
 (use-package embark-consult
   :defer)
@@ -1106,6 +1056,7 @@
               (add-hook 'post-command-hook #'scroll-right nil t)))
 
   ;; Sync history on every command, in case I powercycle the computer
+
   (add-hook 'my-real-eshell-post-command-hook #'eshell-write-history)
   (add-hook 'eshell-before-prompt-hook #'my-esh-save-scrollback)
 
@@ -1116,18 +1067,11 @@
   ;; Misc
   ;; (add-hook 'my-real-eshell-post-command-hook #'my-esh-narrow-to-output 95)
 
-  ;; The natural pager for shell.el/eshell, since they lack all terminal features.
-  ;; Bear in mind the setting will also apply to programs spawned from Emacs,
-  ;; such as (let's say) Alacritty, RStudio & VSCodium, which may not be a problem,
-  ;; but it would be hygienic to revert this setting when calling make-process.
-  ;; (setenv "PAGER" "cat")
-
   ;; TODO: try the "smart" thing for a while
   ;; (use-package em-smart
   ;;   :custom ((eshell-review-quick-commands nil)
   ;;            (eshell-smart-space-goes-to-end t)
   ;;            (eshell-where-to-jump 'begin)))
-
 
   (after! em-hist
     (setopt eshell-hist-ignoredups t)
@@ -1143,7 +1087,8 @@
   ;; )
   )
 
-(use-package ess :defer
+(use-package ess
+  :defer
   :config
   (defun my-append-to-rhistory (input)
     (with-temp-buffer
@@ -1192,6 +1137,7 @@
   :ensure (:repo "https://github.com/meedstrom/eva"
                  :files (:defaults "assets" "renv" "*.R" "*.gnuplot"))
   :init
+  :config
   ;; (setopt eva-debug t)
   (setopt eva-fallback-to-emacs-idle t)
   (setopt eva-init-r nil)
@@ -1200,7 +1146,6 @@
   (setopt eva-buffer-focus-log-path "/home/kept/self-data/buffer-focus.tsv")
   (setopt eva-buffer-info-path      "/home/kept/self-data/buffer-info.tsv")
   (setopt eva-past-sample-function #'eva-past-sample-casual)
-  :config
   (setopt ess-ask-for-ess-directory nil) ;; Prevent annoying ESS startup prompt
   (require 'eva-builtin)
   ;; Looked up by `eva-present-diary', but org-journal not needed
@@ -1295,12 +1240,12 @@
 
 (use-package fd-dired
   :when (or (executable-find "fd") (executable-find "fdfind"))
-  :defer t
+  :defer
   :init
-  (global-set-key [remap find-dired] #'fd-dired)
-  (set-popup-rule! "^\\*F\\(?:d\\|ind\\)\\*$" :ignore t))
+  (global-set-key [remap find-dired] #'fd-dired))
 
-(use-package forge :after magit )
+(use-package forge
+  :after magit)
 
 (use-package form-feed
   :config
@@ -1315,7 +1260,8 @@
 (use-package goggles
   :hook ((prog-mode text-mode) . goggles-mode))
 
-(use-package gif-screencast :defer
+(use-package gif-screencast
+  :defer
   :init
   ;; Support KDE on Wayland
   ;; (setq gif-screencast-program "spectacle")
@@ -1330,10 +1276,14 @@
   (when (modulep! :completion helm)
     (define-key global-map [remap switch-to-buffer] #'helm-mini)))
 
-(use-package highlight-quoted :defer :init
+(use-package highlight-quoted
+  :defer
+  :init
   (add-hook 'emacs-lisp-mode-hook #'highlight-quoted-mode))
 
-(use-package hl-todo :defer :init
+(use-package hl-todo
+  :defer
+  :init
   (add-hook 'prog-mode-hook #'hl-todo-mode)
   (add-hook 'yaml-mode-hook #'hl-todo-mode)
   (setq hl-todo-highlight-punctuation ":"
@@ -1356,11 +1306,13 @@
 
 (use-package iedit)
 
-(use-package iflipb :defer
-  :init (setq iflipb-wrap-around t))
+(use-package iflipb
+  :defer
+  :init
+  (setq iflipb-wrap-around t))
 
 ;; maybe this is the one that subtly messes with undo?
-(use-package iscroll :disabled
+(use-package iscroll
   :hook ((text-mode elfeed-show-mode eww-mode shr-mode) . iscroll-mode))
 
 (use-package inline-anki
@@ -1377,8 +1329,8 @@
   (add-to-list 'inline-anki-fields '("Online mirror" . my-anki-field-for-webpage))
   (add-to-list 'inline-anki-ignore-file-regexps "/daily/"))
 
-(use-package magit :defer
-  :after transient)
+(use-package magit
+  :defer)
 
 (use-package marginalia
   :config
@@ -1402,7 +1354,8 @@
             ("C-c C-c")
             ("C-c C-," . org-mode-map))))
 
-(use-package nameless :defer
+(use-package nameless
+  :defer
   :init
   (setopt nameless-prefix "⁓")
   (setopt nameless-private-prefix t)
@@ -1416,7 +1369,9 @@
 (use-package objed
   :commands objed-ipipe)
 
-(use-package org :ensure nil :defer
+(use-package org
+  :ensure nil
+  :defer
   :init
   (setq org-timestamp-custom-formats '("%Y-%b-%d" . "%Y-%m-%d %a %H:%M"))
   (setq org-pretty-entities t)
@@ -1425,12 +1380,6 @@
   (setq org-clock-auto-clock-resolution t)
   ;; (setq org-startup-folded 'nofold)
   (setq citar-bibliography '("/home/kept/roam/refs/library_biblatex.bib"))
-  ;; (setq org-agenda-todo-list-sublevels nil)
-  (setq org-agenda-include-diary nil) ;; perf... :(
-  (setq org-agenda-dim-blocked-tasks nil) ;; perf
-  (setq org-agenda-use-tag-inheritance '(todo search)) ;; perf
-  (setq org-agenda-ignore-properties '(stats)) ;; perf
-  (setq org-agenda-inhibit-startup t) ;; perf
   (setq org-archive-save-context-info '(time file itags olpath))
   (setq org-export-backends '(html latex odt texinfo))
   (setq org-export-with-toc nil)
@@ -1508,12 +1457,7 @@
   (unless after-init-time
     (setq debug-on-error t)
     (message "Org loaded during init, I don't want this"))
-
-  (named-timer-run :my-clock-reminder nil 600
-                   (defun my-clock-remind ()
-                     (when (org-clock-is-active)
-                       (message (concat "Currently working on: "
-                                        org-clock-current-task)))))
+  
   ;; If using Doom's Org
   (if (and (boundp 'doom-version)
            (modulep! :lang org))
@@ -1527,16 +1471,22 @@
     (add-hook 'text-scale-mode-hook #'my-change-latex-scale))
   )
 
-(use-package org-agenda :disabled
+(use-package org-agenda
   :ensure nil
+  :defer
   :init
+  ;; (setq org-agenda-todo-list-sublevels nil)
+  (setq org-agenda-include-diary nil) ;; perf... :(
+  (setq org-agenda-dim-blocked-tasks nil) ;; perf
+  (setq org-agenda-use-tag-inheritance '(todo search)) ;; perf
+  (setq org-agenda-ignore-properties '(stats)) ;; perf
+  (setq org-agenda-inhibit-startup t) ;; perf
   ;; (setopt org-babel-load-languages '((R . t)
   ;;                                    (emacs-lisp . t)
   ;;                                    (calc . t)
   ;;                                    (ditaa . t)
   ;;                                    (sqlite . t)
   ;;                                    (dot . t)))
-
   ;; (setopt org-agenda-prefix-format '((agenda . " %i %-12:c%?-12t% s")
   ;;                                    (todo . " %i %-32b") ;; have breadcrumbs
   ;;                                    (tags . " %i %-12:c")
@@ -1548,16 +1498,17 @@
   ;; (setopt org-agenda-tag-filter-preset '("-exclude"))
   )
 
-(use-package org-node :after org
+(use-package org-node
   :ensure (:repo "/home/kept/emacs/org-node" :branch "dev")
+  :after org
   :config
   ;; (setq org-node--debug nil)
   (setopt org-node-extra-id-dirs '("/home/kept/roam/" "/home/me/.doom.d/"))
   ;; (setopt org-node-eagerly-update-link-tables t)
   ;; (setopt org-node-perf-assume-coding-system 'utf-8-auto-unix)
   ;; (setopt org-node-ask-directory "/home/kept/roam")
-  (setopt org-node-prefer-file-level-nodes nil)
-  ;; (setopt org-node-filename-fn #'org-node-slugify-like-roam)
+  ;; (setopt org-node-prefer-file-level-nodes nil)
+  ;; (setopt org-node-slug-fn #'org-node-slugify-like-roam-default)
   (setopt org-node-datestamp-format "")
   (add-hook 'after-save-hook 'org-node-rename-file-by-title-maybe)
   (setopt org-node-slug-fn #'org-node-slugify-for-web)
@@ -1593,7 +1544,8 @@
   (add-hook 'org-noter-notes-mode-hook #'abbrev-mode)
   (add-hook 'org-noter-notes-mode-hook (lambda () rainbow-delimiters-mode 0)))
 
-(use-package org-roam :defer
+(use-package org-roam
+  :defer
   :init
   (add-hook 'org-roam-capture-new-node-hook #'org-node-put-created)
   (setopt org-roam-file-exclude-regexp '("logseq/bak/" "logseq/version-files/"))
@@ -1623,15 +1575,18 @@
                   (recenter 0)
                   args))))
 
-(use-package org-transclusion :defer
+(use-package org-transclusion
+  :defer
   :config
   (set-face-background 'org-transclusion "#222")
   (setopt org-transclusion-exclude-elements '(property-drawer comment keyword)))
 
-(use-package quickroam :defer
-  :ensure (:repo "https://github.com/meedstrom/quickroam"))
+(use-package quickroam
+  :ensure (:repo "https://github.com/meedstrom/quickroam")
+  :defer)
 
-(use-package prism :defer
+(use-package prism
+  :defer
   ;; Wishlist: an odd default for Lisp is that the parens enclosing a sexp
   ;; differ in color from the symbols inside -- I'd like it the same color
   :init
@@ -1740,75 +1695,6 @@
   (ws-butler-global-mode))
 
 
-;;;; CAPF (completion-at-point functions)
-
-;; Wishlist: That consult-outline, and consult-line with the following setting,
-;; would start near where point is.  That is, scroll!
-;; (setq consult-line-start-from-top t)
-
-;; (defvar me/consult-curr-line nil)
-
-;; (advice-add 'consult--line-candidates :after
-;;             (defun blargh (_top curr-line)
-;;               (setq me/consult-curr-line curr-line)))
-
-;; (add-hook 'minibuffer-setup-hook
-;;           (defun me/setup-consult-line-and-outline ()
-;;             (when (memq this-command '(consult-line consult-outline))
-;;               (vertico-next me/consult-curr-line)
-
-;;               (message "%s" me/consult-curr-line
-;;                        ;; (orderless-annotation 'always )
-;;                        )
-;;               ))
-;;           100)
-
-
-
-;;;; Eshell
-
-
-
-;; Encourage idiomatic ways to work with Emacs
-;; (after! eshell
-;;   (after! em-ls
-;;     (defun eshell/ls (&rest args)
-;;       (if (null args)
-;;           (dired-jump)
-;;         (kill-new (apply #'concat args))
-;;         "ls: ls is blocked, but added your input to kill ring.  Try C-x C-f C-y RET?")))
-;;   (after! em-dirs
-;;     (defun eshell/cd (&rest args)
-;;       (if (null args)
-;;           (let ((default-directory "~"))
-;;             (my-esh-here))
-;;         (kill-new (apply #'concat args))
-;;         ;; (my-hook-once 'my-real-eshell-post-command-hook
-;;         ;;   (eshell-previous-prompt 1))
-;;         "cd: cd is blocked, but added your input to kill ring.  Try C-x C-f C-y RET?"))))
-
-;; (set-eshell-alias! "less" "view-file $1")
-
-;; Wishlist:
-
-;; - Stop the experiments of .eshell-scrollback and .eshell-command-history,
-;;   keep track in .emacs.d/cache/ instead
-
-;;   - Stretch goal: For robustness, attempt to sync to at least two places:
-;;     locally in the dir AND in .emacs.d.  To merge mismatched syncs, just add
-;;     together the logs, which are of course timestamped to the unix
-;;     nanosecond, sort by time, and dedup. This way, the local dir file can
-;;     regenerate from .emacs.d, and .emacs.d can regenerate from the local dir
-;;     file!  And local file need not exist at all (helps when dir unwritable,
-;;     or when the user disabled writing local files).
-
-
-(defun my-publish ()
-  (interactive)
-  (load (concat user-emacs-directory "publish-blog"))
-  (call-interactively #'my-publish-begin))
-
-
 ;;;; Life-organization essentials 2024-06-06
 
 (setopt org-reverse-note-order t)
@@ -1819,10 +1705,11 @@
 (setopt org-habit-following-days 0)
 (setopt org-habit-preceding-days 14)
 (after! org (setopt org-todo-keywords '((sequence "IDEA" "DONE"))))
-(setq org-agenda-files (-filter #'file-exists-p
-                                '("/home/kept/roam/daily-review.org"
-                                  "/home/kept/roam/outcomes.org"
-                                  "/home/kept/roam/ideas.org")))
+(setq org-agenda-files
+      (seq-filter #'file-exists-p
+                  '("/home/kept/roam/daily-review.org"
+                    "/home/kept/roam/outcomes.org"
+                    "/home/kept/roam/ideas.org")))
 
 (setq org-capture-templates
       '(("o" "Outcome"
@@ -1908,98 +1795,15 @@
                 (set-face-foreground 'org-done grey)))
             (after! org-habit
               ;; the default red color doesn't end up helping my psyche
-              (set-face-attribute 'org-habit-overdue-face ()
-                                  :background (or (face-foreground 'font-lock-comment-face) 'unspecified))
-              (set-face-attribute 'org-habit-overdue-future-face ()
-                                  :background (or (face-foreground 'font-lock-comment-face) 'unspecified)))))
+              (set-face-attribute
+               'org-habit-overdue-face ()
+               :background (or (face-foreground 'font-lock-comment-face) 'unspecified))
+              (set-face-attribute
+               'org-habit-overdue-future-face ()
+               :background (or (face-foreground 'font-lock-comment-face) 'unspecified)))))
 
 
-;;;; Small lazy pkgs
-
-(setopt helpful-max-buffers nil) ;; what's the point of killing buffers
-(setopt ranger-map-style 'emacs)
-(setopt which-key-idle-delay 0.2)
-(setopt rainbow-x-colors nil) ;; only colorize hex strings
-
-
-
-;;;; Experiments
-
-;; (use-package scroll-on-drag
-;;   :config (keymap-set ))
-
-;; TODO: actually let's set window fringes, so that the whitespace in the centre blends together
-;; i.e. instead of fringes F-2F-F, let's have just F-F-F.
-(defun fringe-from-fill-column ()
-  "Return a cons cell where the `car' is the amount of windows
-you would be able to fit side-by-side in a frame as wide as
-`frame-width' while being sized to `fill-column', and the `cdr'
-is the max possible pixel value you can set for the fringe-width
-in this configuration.
-
-Assumes that you want the windows to fit 1 more character than
-the fill column i.e. for a `fill-column' of 80, that you want a
-window at least 81 chars wide.
-
-Assumes there are no window dividers."
-  (let* ((pixels-per-char (/ (frame-pixel-width) (frame-width)))
-         (needed-window-char-width (1+ (default-value 'fill-column)))
-         (needed-window-px-width (* needed-window-char-width pixels-per-char))
-         (n-windows-possible (/ (frame-pixel-width) needed-window-px-width))
-         (leftover-px (mod (frame-pixel-width) needed-window-px-width))
-         (leftover-px-per-window (/ leftover-px n-windows-possible)))
-    (cons n-windows-possible (/ leftover-px-per-window 2))))
-;; (set-fringe-mode (cdr (fringe-from-fill-column)))
-
-(defun window-leftover-px-after-satisfying-fill-column ()
-  (let* ((pixels-per-char (/ (window-pixel-width) (window-total-width)))
-         (window-minimum-px (* (1+ fill-column) pixels-per-char)))
-    (- (window-pixel-width) window-minimum-px)))
-
-;; (defvar pad-fringes-to-fill-column--state nil)
-;; aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-;; OK, I know what to do.  This function gonna run mutually-recursed-once for every live window,
-;; right?  Then first it checks if the window is already insufficient for
-;; fill-column, and minimizes the fringes if so.  Otherwise, it looks up the
-;; parent to check if it is a horizontal group.  If the width of that group
-;; matches the frame width, then it will try to do something that results in
-;; F-F-F arrangement. otherwise it falls back to the dumb method that would
-;; result in F-2F-F.  Don't really need code to cover that since it seems
-;; extremely hard to end up in that situation and those ppl can live with it.
-(defun pad-fringes-to-fill-column (&rest _)
-  (interactive)
-  (cond
-   ;; In horizontal group
-   ((window-combined-p (selected-window) t)
-    (let ((and-siblings (cddar (window--subtree (window-parent)))))
-      (if (>= fill-column (window-total-width))
-          ;; Fallback if the window is already insufficient for fill-column.
-          ;; Here we could do something clever like temporarily decrease
-          ;; the font size...  But that's a stretch goal if anything.
-          (dolist (win and-siblings)
-            (with-selected-window win
-              (set-window-fringes (selected-window) 0)
-              (unless window-divider-mode (window-divider-mode))))
-        (dolist (win and-siblings)
-          (with-selected-window win
-            (let ((max-px (window-leftover-px-after-satisfying-fill-column)))
-              (set-window-fringes (selected-window) (/ max-px 2) (/ max-px 2) t)
-              (when window-divider-mode (window-divider-mode 0))))))))
-   ;; In vertical group
-   ((window-combined-p (selected-window))
-    )
-   ;; No group; must be root window
-   ((frame-root-window-p (selected-window))
-    (let ((max-px (window-leftover-px-after-satisfying-fill-column)))
-      (set-window-fringes (selected-window) (/ max-px 2) (/ max-px 2))))
-   (t
-    (message "pad-fringes-to-fill-column: Not expected to be here"))))
-
-;; (add-hook 'window-size-change-functions #'pad-fringes-to-fill-column)
-;; (add-hook 'window-buffer-change-functions #'pad-fringes-to-fill-column)
-
-(me/genhook elpaca-after-init-hook
-  (setq my-stim-collection (my-stim-collection-generate)))
+;;; Auto-save-visited replica
 
 ;; I used `auto-save-visited-mode' for years.  But many Emacs features are noisy
 ;; on save, and I finally tired of the noise.  We can configure the classic
@@ -2026,3 +1830,44 @@ Assumes there are no window dividers."
         (unwind-protect
             (recover-file buffer-file-name)
           (setq mutually-recursed-once nil))))))
+
+
+;;;; Experiment zone
+
+(setopt helpful-max-buffers nil) ;; what's the point of killing buffers
+(setopt ranger-map-style 'emacs)
+(setopt which-key-idle-delay 0.2)
+(setopt rainbow-x-colors nil) ;; only colorize hex strings
+
+;; (use-package scroll-on-drag
+;;   :config (keymap-set ))
+
+(me/genhook elpaca-after-init-hook
+  (setq my-stim-collection (my-stim-collection-generate)))
+
+;; Wishlist: That consult-outline, and consult-line with the following setting,
+;; would start near where point is.  That is, scroll!
+;; (setq consult-line-start-from-top t)
+
+;; (defvar me/consult-curr-line nil)
+
+;; (advice-add 'consult--line-candidates :after
+;;             (defun blargh (_top curr-line)
+;;               (setq me/consult-curr-line curr-line)))
+
+;; (add-hook 'minibuffer-setup-hook
+;;           (defun me/setup-consult-line-and-outline ()
+;;             (when (memq this-command '(consult-line consult-outline))
+;;               (vertico-next me/consult-curr-line)
+
+;;               (message "%s" me/consult-curr-line
+;;                        ;; (orderless-annotation 'always )
+;;                        )
+;;               ))
+;;           100)
+
+
+(defun my-publish ()
+  (interactive)
+  (load (concat user-emacs-directory "publish-blog"))
+  (call-interactively #'my-publish-begin))

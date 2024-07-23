@@ -1248,18 +1248,22 @@ until the program finishes."
       (message "No more files in directory"))))
 
 ;; bloggable
-(defun my-compile-and-drop ()
+(defun my-compile-and-drop (&optional interactive)
   "Compile buffer to check for errors, but don't write an .elc.
 Original inspiration was to catch malformed sexps like
  (global-set-key \"C-x c\" ...) that would break init, not for
 nitpicking things that work, so `byte-compile-warnings' is
 temporarily overridden."
-  (interactive)
+  (interactive "p")
   (when (derived-mode-p #'emacs-lisp-mode)
-    (cl-letf ((byte-compile-dest-file-function (lambda (_) (null-device)))
-              (inhibit-message t) ;; prevent "Wrote /dev/null"
-              ((symbol-value 'byte-compile-warnings) nil))
-      (byte-compile-file (buffer-file-name)))))
+    (let ((byte-compile-dest-file-function (lambda (_) (null-device)))
+          ;; prevent "Wrote /dev/null"
+          (inhibit-message t))
+      (if interactive
+          (byte-compile-file (buffer-file-name))
+        ;; When used as a hook, only warn about real errors
+        (cl-letf ((symbol-value 'byte-compile-warnings) nil)
+          (byte-compile-file (buffer-file-name)))))))
 
 (defvar my-buffer-ring nil)
 (defun my-nth-buffer-of-same-mode (n)
@@ -2376,6 +2380,18 @@ have been set by `my-esh-rename' on
                           'append 'silently)
             ))))))
 
+;; Wishlist:
+
+;; - Stop the experiments of .eshell-scrollback and .eshell-command-history,
+;;   keep track in .emacs.d/cache/ instead
+
+;;   - Stretch goal: For robustness, attempt to sync to at least two places:
+;;     locally in the dir AND in .emacs.d.  To merge mismatched syncs, just add
+;;     together the logs, which are of course timestamped to the unix
+;;     nanosecond, sort by time, and dedup. This way, the local dir file can
+;;     regenerate from .emacs.d, and .emacs.d can regenerate from the local dir
+;;     file!  And local file need not exist at all (helps when dir unwritable,
+;;     or when the user disabled writing local files).
 (defun my-esh-save-scrollback ()
   (let* ((file (or (bound-and-true-p my-esh-scrollback-file)
                    (my-esh-scrollback-file)))
