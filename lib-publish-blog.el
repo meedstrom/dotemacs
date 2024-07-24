@@ -1,4 +1,4 @@
-;; Publishing to edstrom.dev -*- lexical-binding: t; -*-
+;;; lib-publish-blog.el -- Publishing to edstrom.dev -*- lexical-binding: t; -*-
 
 (defvar my-tags-to-avoid-uploading '("noexport" "archive" "private" "censor"))
 (defvar my-tags-for-hiding '("gri" "shrink" "privy" "lover" "fren"))
