@@ -1,7 +1,4 @@
-;; -*- lexical-binding: t; -*-
-
-
-;;;; Publishing to edstrom.dev
+;; Publishing to edstrom.dev -*- lexical-binding: t; -*-
 
 (defvar my-tags-to-avoid-uploading '("noexport" "archive" "private" "censor"))
 (defvar my-tags-for-hiding '("gri" "shrink" "privy" "lover" "fren"))
@@ -21,7 +18,7 @@
 ;; e.g. "org953031".  That way, hash-links such as
 ;; #ID-e10bbdfe-1ffb-4c54-9228-2818afdfc5ba will make the web browser jump to
 ;; that heading.  Thank org-roam for including this code!  Note that I convert
-;; these IDs later using `my-uuid-to-short'.
+;; these IDs later away from UUID form using `my-uuid-to-short'.
 (after! ox
   (require 'org-roam-export))
 
@@ -581,21 +578,6 @@ If FORCE, force a rebuild of the cache from scratch."
              (org-roam-db-clear-file file)
              (lwarn 'org-roam :error "Failed to process %s with error %s, skipping..."
                     file (error-message-string err)))))))))
-
-;; ;; Fix
-;; (defun helm-get-firefox-user-init-dir (directory)
-;;   "Guess the default Firefox user directory name."
-;;   (with-temp-buffer
-;;     (insert-file-contents
-;;      (expand-file-name "profiles.ini" directory))
-;;     (goto-char (point-min))
-;;     (search-forward "Default=1")
-;;     (search-backward "Path=")
-;;     (file-name-as-directory (expand-file-name
-;;                              (buffer-substring-no-properties
-;;                               (match-end 0) (point-at-eol))
-;;                              directory))))
-
 
 ;; Fix: don't publish files that have a #+FILETAGS matching :exclude-tags
 (after! ox-publish

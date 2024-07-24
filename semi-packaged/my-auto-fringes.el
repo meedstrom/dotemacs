@@ -46,16 +46,18 @@
       (if (>= fill-column (window-total-width))
           ;; Fallback if the window is already insufficient for fill-column.
           ;; Here we could do something clever like temporarily decrease
-          ;; the font size...  But that's a stretch goal if anything.
+          ;; the font size...  But no.  Eliminate fringes.
           (dolist (win and-siblings)
             (with-selected-window win
               (set-window-fringes (selected-window) 0)
-              (unless window-divider-mode (window-divider-mode))))
+              (unless window-divider-mode
+                (window-divider-mode))))
         (dolist (win and-siblings)
           (with-selected-window win
             (let ((max-px (window-leftover-px-after-satisfying-fill-column)))
               (set-window-fringes (selected-window) (/ max-px 2) (/ max-px 2) t)
-              (when window-divider-mode (window-divider-mode 0))))))))
+              (when window-divider-mode
+                (window-divider-mode 0))))))))
    ;; In vertical group
    ((window-combined-p (selected-window))
     )

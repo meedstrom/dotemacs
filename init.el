@@ -58,10 +58,6 @@
 (use-package dash) 
 (elpaca-wait)
 
-;; Ensure the initial frame is dark even if it hasn't my real theme
-(setq custom-safe-themes t)
-(load-theme 'wombat)
-
 
 ;;;; Load my code
 
@@ -94,13 +90,12 @@
 (defun me/progressive-preload ()
   (while-no-input
     (while-let ((next-lib (pop me/progressive-preload-queue)))
-      (message "Preloading... (%S)" next-lib)
       (let ((inhibit-message t))
+        (message "Preloading... (%S)" next-lib)
         (ignore-errors
           (require next-lib nil t)))))
   (if me/progressive-preload-queue
-      (run-with-idle-timer 2 nil #'me/progressive-preload)
-    (message "Preloading... done")))
+      (run-with-idle-timer 2 nil #'me/progressive-preload)))
 
 (defvar me/progressive-preload-queue
   '(dired

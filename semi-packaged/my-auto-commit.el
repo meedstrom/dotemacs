@@ -76,11 +76,15 @@ Suitable on `after-save-hook'."
                                 "git log -n 1 --pretty=format:%s")))
           (if (string-search "Fatal" last-commit-date)
               (message "Git failed, probably not a Git repo: %s" default-directory)
-            ;; Special case for Org-Roam: auto-stage new notes, bc it happens often
-            (and (equal "org" (file-name-extension (buffer-file-name)))
-                 (string-search org-roam-directory default-directory)
-                 ;; (magit-run-git "add" (buffer-file-name))
-                 (my-exec "git" "add" (buffer-file-name)))
+            ;; Special case for Org-roam: auto-stage new notes, bc it happens
+            ;; often
+            (if (buffer-file-name)
+                (and (equal "org" (file-name-extension (buffer-file-name)))
+                     (string-search org-roam-directory default-directory)
+                     ;; (magit-run-git "add" (buffer-file-name))
+                     (my-exec "git" "add" (buffer-file-name)))
+              (message "my-auto-commit: Not a file-visiting buffer %s"
+                       (buffer-name)))
 
             (if (magit-untracked-files)
                 (message "Won't auto-commit.  Stage untracked files or edit .gitignore")

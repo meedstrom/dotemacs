@@ -131,16 +131,6 @@
                "/home/kept/emacs/twee-mode/"))
   (add-to-list 'load-path dir))
 
-;; Set up booleans I can use here and there throughout init.
-(defvar os-debian (executable-find "apt-get"))
-(defvar os-arch (or (string-search "arch" operating-system-release)
-                    (string-search "arch" (shell-command-to-string "cat /etc/os-release"))))
-(defvar os-guix (string-search "shepherd" (shell-command-to-string "ps -q 1 -o comm=")))
-
-(let ((oses (list os-debian os-arch os-guix)))
-  (when (< 1 (length (remove nil oses)))
-    (warn "In my init: Two or more OS checks succeeded")))
-
 ;; TODO: Periodically re-test internet connectivity and set this, would be
 ;; useful for `my-stim' among other commands.
 (defvar internet-connected nil)
@@ -149,11 +139,6 @@
 ;; (defvar child-emacs nil)
 ;; (process-attributes (emacs-pid))
 
-;; When I'm not on a tiling WM, maximized Emacs acts as my wallpaper.
-;; (add-to-list 'initial-frame-alist '(fullscreen . fullboth))
-(add-to-list 'initial-frame-alist '(fullscreen . maximized))
-;; (add-to-list 'default-frame-alist '(alpha-background . 30))
-;; (set-frame-parameter nil 'alpha-background 82)
 
 
 ;;; Font
@@ -189,6 +174,7 @@
 (fset #'display-startup-echo-area-message #'ignore)
 (setq inhibit-startup-screen t)
 (recentf-mode)
+(blink-cursor-mode 0)
 (savehist-mode)
 (save-place-mode)
 (column-number-mode)
@@ -228,18 +214,14 @@
 ;; (context-menu-mode)
 ;; (repeat-mode)
 
-;; Limit scrollback because gcc and R can spit out enough to slow my system.
+;; Limit scrollback because gcc and R can spit out enough to slow my system (at
+;; least when fontified).
 ;; Good values:
 ;; 2^12 on Latitude E7250.
 ;; 2^10 on Thinkpad X200.
 (setq comint-buffer-maximum-size (^ 2 10))
 (add-hook 'comint-output-filter-functions
           #'my-truncate-buffer-and-move-excess)
-
-;; for ess it would be useful to autoscroll the R console when sending
-;; expressions from an R file. Maybe not great while I'm inside a shell buffer
-;; or other comint buffer directly
-(setq comint-scroll-to-bottom-on-input t)
 
 (setq savehist-additional-variables '(kill-ring
                                       register-alist
@@ -248,8 +230,8 @@
 
 (setq mode-line-percent-position nil)
 (setq mode-line-modes nil)
-(setq undo-limit (* 16 1000 1000)) ;; 16 MB, not default 160 kB
-(setq undo-strong-limit (* 24 1000 1000))
+(setq undo-limit (* 4 1000 1000)) ;; 4 MB (default 160 kB)
+(setq undo-strong-limit (* 6 1000 1000))
 (setq ring-bell-function #'ignore)
 (setq gnus-select-method '(nntp "news.eternal-september.org"))
 (setq byte-compile-warnings '(not free-vars))
@@ -264,10 +246,9 @@
 (setq enable-local-variables :all)
 (setq custom-safe-themes t)
 (setq message-log-max 8000)
-(setq disabled-command-function nil) ;; BUG: clutters init.el not custom.el
+(setq disabled-command-function nil) ;; bug: clutters init.el, not custom.el
 (setq kill-read-only-ok t)
 (setq kill-ring-max 600)
-(setq-default mode-line-format (delete '(vc-mode vc-mode) mode-line-format))
 (setq-default enable-recursive-minibuffers t)
 (setq-default fill-column 79)
 (setq-default indent-tabs-mode nil)
@@ -280,8 +261,8 @@
 (setq proced-enable-color-flag t)
 (setq abbrev-suggest t)
 (setq use-short-answers t)
-;; (setq eval-expression-print-length 64)
-;; (setq eval-expression-print-level 16)
+(setq eval-expression-print-length 32)
+(setq eval-expression-print-level 8)
 
 ;; Don't clear my echo area
 (setq garbage-collection-messages nil)
@@ -1089,6 +1070,8 @@
 
 (use-package ess
   :defer
+  :init (add-hook 'inferior-ess-mode-hook
+                  (lambda () (setq-local comint-scroll-to-bottom-on-input t)))
   :config
   (defun my-append-to-rhistory (input)
     (with-temp-buffer
@@ -1338,9 +1321,9 @@
 
 (use-package massmapper
   :ensure (:repo "https://github.com/meedstrom/massmapper")
-  ;; :init (add-hook 'elpaca-after-init-hook #'massmapper-mode)
-  :config
-  (massmapper-mode)
+  :demand
+  :init
+  (add-hook 'elpaca-after-init-hook #'massmapper-mode)
   (add-hook 'massmapper-keymap-found-hook #'massmapper-define-super-like-ctl)
   (add-hook 'massmapper-keymap-found-hook #'massmapper-homogenize -50)
   ;; (add-hook 'massmapper-keymap-found-hook #'massmapper-protect-ret-and-tab -75)
@@ -1352,7 +1335,9 @@
             ("C-x C-;" . global-map)
             ("C-x C-l" . global-map)
             ("C-c C-c")
-            ("C-c C-," . org-mode-map))))
+            ("C-c C-," . org-mode-map)))
+  :config
+  (massmapper-mode))
 
 (use-package nameless
   :defer
@@ -1365,6 +1350,13 @@
 
 (use-package nov
   :mode ("\\.epub\\'" . nov-mode))
+
+(use-package dropped-olivetti :disabled
+  :ensure (:repo "https://github.com/meedstrom/dropped-olivetti")
+  :config
+  (setq dropped-olivetti-style 'fancy)
+  (setq-default dropped-olivetti-body-width 81)
+  (dropped-olivetti-mode))
 
 (use-package objed
   :commands objed-ipipe)
@@ -1502,13 +1494,15 @@
   :ensure (:repo "/home/kept/emacs/org-node" :branch "dev")
   :after org
   :config
+  (setq org-roam-directory "/home/kept/roam/")
   ;; (setq org-node--debug nil)
   (setopt org-node-extra-id-dirs '("/home/kept/roam/" "/home/me/.doom.d/"))
   ;; (setopt org-node-eagerly-update-link-tables t)
   ;; (setopt org-node-perf-assume-coding-system 'utf-8-auto-unix)
   ;; (setopt org-node-ask-directory "/home/kept/roam")
-  ;; (setopt org-node-prefer-file-level-nodes nil)
+  (setopt org-node-prefer-with-heading nil)
   ;; (setopt org-node-slug-fn #'org-node-slugify-like-roam-default)
+  ;; (setopt org-node-datestamp-format "%Y%m%dT%H%M%S--")
   (setopt org-node-datestamp-format "")
   (add-hook 'after-save-hook 'org-node-rename-file-by-title-maybe)
   (setopt org-node-slug-fn #'org-node-slugify-for-web)
@@ -1581,7 +1575,7 @@
   (set-face-background 'org-transclusion "#222")
   (setopt org-transclusion-exclude-elements '(property-drawer comment keyword)))
 
-(use-package quickroam
+(use-package quickroam :disabled
   :ensure (:repo "https://github.com/meedstrom/quickroam")
   :defer)
 
@@ -1869,5 +1863,11 @@
 
 (defun my-publish ()
   (interactive)
-  (load (concat user-emacs-directory "publish-blog"))
+  (load (concat user-emacs-directory "lib-publish-blog"))
   (call-interactively #'my-publish-begin))
+
+;; When closing and reopening Emacs often (esp with 2+ simultaneous instances),
+;; ALL THE TIME things missing from recentf.  Becaus the design implements no
+;; crash-only principles.
+;; (add-to-list 'recentf-used-hooks '(find-file-hook recentf-save-list 90))
+(advice-add #'recentf-track-opened-file :after #'recentf-save-list)
