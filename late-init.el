@@ -899,36 +899,7 @@
                   (org-entry-put nil "CREATED"
                                  (or parent-creation
                                      (format-time-string
-                                      (org-time-stamp-format nil t)))))))
-  (add-to-list 'org-node-series
-               '("c"
-                 :name "All nodes by creation-time"
-                 :classifier
-                 (let ((tbl (make-hash-table :test #'equal)))
-                   (lambda (node)
-                     (let* ((raw (cdr (assoc "CREATED"
-                                             (org-node-get-properties node))))
-                            (date (if raw (substring raw 1 11)))
-                            (count (length (gethash date tbl))))
-                       (when date
-                         (push count (gethash date tbl))
-                         (cons (concat date ":::" count)
-                               (org-node-get-id node))))))
-                 :whereami
-                 (lambda ()
-                   (or (org-entry-get nil "CREATED" t)))
-                 :prompter org-read-date)))
-
-;; (defun org-node--string->eqkey (str)
-;;   "Turn STR into an unique integer."
-;;   (string-to-number
-;;    (string-join (mapcar #'number-to-string (string-to-list str)))))
-
-;; (sxhash-eq "d")
-;; (sxhash-equal "a")
-;; (sxhash "a b")
-;; (eq '(33 35) '(33 35))
-;; (char-to-string 35)
+                                      (org-time-stamp-format nil t))))))))
 
 (use-package org-noter :disabled
   :init

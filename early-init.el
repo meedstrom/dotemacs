@@ -3,10 +3,20 @@
 ;; Disarm package.el
 (setq package-enable-at-startup nil)
 
-;; Temp override for faster init (2.5s init became 1.5s)
+;; Temp override for faster init (cut 2.5s init to 1.5s)
 (defvar me/original-fnha file-name-handler-alist)
 (setq file-name-handler-alist nil)
 (setq gc-cons-threshold most-positive-fixnum)
+(add-hook 'elpaca-after-init-hook
+          (lambda ()
+            "Undo temporary overrides, and report init time."
+            (message "Init took %.2fs, post-init took %.2fs "
+                     (float-time (time-subtract after-init-time
+                                                before-init-time))
+                     (float-time (time-since after-init-time)))
+            (setq file-name-handler-alist me/original-fnha)
+            (setq gc-cons-threshold 800000))
+          95)
 
 ;; Set GUI parameters in early-init to reduce the flicker of reconfiguration
 (setq initial-frame-alist '((fullscreen . maximized)
@@ -14,12 +24,10 @@
                             (foreground-color . "#fff")))
 (setq default-frame-alist '((vertical-scroll-bars . nil)
                             (tool-bar-lines . nil)
-                            (menu-bar-lines . nil)
-                            ;; (alpha-background . 85)
-                            ))
+                            (menu-bar-lines . nil)))
 
-;; Temp nil modeline saves ~20ms (@1GHz), but more importantly the init
-;; process looks nicer
+;; A temporarily nil modeline saves ~20ms of init (@1GHz), but more
+;; importantly, the init process looks nicer
 (add-hook 'elpaca-after-init-hook
           `(lambda ()
              (setq-default mode-line-format

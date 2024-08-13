@@ -1,6 +1,7 @@
 ;; -*- lexical-binding: t; -*-
 
-;; Init Elpaca the package manager (snippet from their README)
+;;; Init Elpaca the package manager (snippet from their README)
+
 (defvar elpaca-installer-version 0.7)
 (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
 (defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
@@ -25,8 +26,8 @@
                  ((zerop (call-process "git" nil buffer t "checkout"
                                        (or (plist-get order :ref) "--"))))
                  (emacs (concat invocation-directory invocation-name))
-                 ((zerop (call-process emacs nil buffer nil "-Q" "-L" "." "--batch"
-                                       "--eval" "(byte-recompile-directory \".\" 0 'force)")))
+                 ((zerop (call-process emacs nil buffer nil "-Q" "-L" "e" "--batch"
+                                       "--eval" "(byte-recompile-directory \"e\" 0 'force)")))
                  ((require 'elpaca))
                  ((elpaca-generate-autoloads "elpaca" repo)))
             (progn (message "%s" (buffer-string)) (kill-buffer buffer))
@@ -39,7 +40,10 @@
 (add-hook 'after-init-hook #'elpaca-process-queues)
 (elpaca `(,@elpaca-order))
 
-;; Config use-package
+
+;;; Main setup
+
+;; Setup use-package
 (elpaca elpaca-use-package
   (setopt use-package-always-ensure t)
   (setopt use-package-compute-statistics t)
@@ -51,42 +55,33 @@
 
 ;; Require packages needed during init
 (use-package no-littering)
-(use-package compat)
 (elpaca-wait)
 (use-package defrepeater)
 (use-package crux) 
 (use-package dash) 
 (elpaca-wait)
 
-
-;;; Load my config
-
-(let ((.emacs.d user-emacs-directory))
-  (load (concat .emacs.d "lib.el"))
-  (dolist (file (directory-files (concat .emacs.d "semi-packaged/")
+;; Execute 99% of my initfiles
+(let ((e user-emacs-directory))
+  (load (concat e "lib.el"))
+  (dolist (file (directory-files (concat e "semi-packaged/")
                                  t "^\\w.*el$"))
     (load file))
-  (load (concat .emacs.d "private.el"))
-  (load (concat .emacs.d "late-init.el"))
-  (load (setq custom-file (concat .emacs.d "custom.el"))))
+  (load (concat e "private.el"))
+  (load (concat e "late-init.el")) ;; The main of the main
+  (load (setq custom-file (concat e "custom.el"))))
 
 
-;;; After init
+;;; Progressively preload packages in the background
 
-(add-hook 'elpaca-after-init-hook
-          (lambda ()
-            (run-with-idle-timer 2 nil #'me/progressively-preload)))
+(add-hook 'elpaca-after-init-hook #'me/progressive-preload 99)
 
-(defun me/progressively-preload ()
-  "Preload lazy packages in the background."
+(defun me/progressive-preload ()
   (while-no-input
     (while-let ((next-lib (pop me/progressive-preload-queue)))
-      (let ((inhibit-message t))
-        (message "Preloading... (%S)" next-lib)
-        (ignore-errors
-          (require next-lib nil t)))))
+      (require next-lib nil t)))
   (if me/progressive-preload-queue
-      (run-with-idle-timer 2 nil #'me/progressively-preload)))
+      (run-with-idle-timer 2 nil #'me/progressive-preload)))
 
 (defvar me/progressive-preload-queue
   '(dired
@@ -113,17 +108,6 @@
     em-tramp
     em-unix
     em-xtra))
-
-;; Undo overrides from early-init.el
-(add-hook 'elpaca-after-init-hook
-          (lambda ()
-            (message "Init took %.2fs, post-init took %.2fs "
-                     (float-time (time-subtract after-init-time
-                                                before-init-time))
-                     (float-time (time-since after-init-time)))
-            (setq file-name-handler-alist me/original-fnha)
-            (setq gc-cons-threshold 800000))
-          99)
 
 ;; Local Variables:
 ;; no-byte-compile: t
