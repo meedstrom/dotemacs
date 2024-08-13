@@ -1,6 +1,6 @@
 ;; -*- lexical-binding: t; -*-
 
-;; Init Elpaca the package manager (snippet provided at their README)
+;; Init Elpaca the package manager (snippet from their README)
 (defvar elpaca-installer-version 0.7)
 (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
 (defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
@@ -59,35 +59,26 @@
 (elpaca-wait)
 
 
-;;;; Load my code
+;;; Load my config
 
-(unwind-protect
-    (let ((.emacs.d user-emacs-directory))
-      (load (concat .emacs.d "lib.el"))
-      (dolist (file (directory-files (concat .emacs.d "semi-packaged/")
-                                     t "^\\w.*el$"))
-        (load file))
-      (load (concat .emacs.d "private.el"))
-      (load (concat .emacs.d "late-init.el"))
-      (load (setq custom-file (concat .emacs.d "custom.el"))))
-  ;; Undo overrides from early-init.el
-  (add-hook 'elpaca-after-init-hook
-            (lambda ()
-              (message "Init took %.2fs, post-init took %.2fs "
-                       (float-time (time-subtract after-init-time
-                                                  before-init-time))
-                       (float-time (time-since after-init-time)))
-              (setq file-name-handler-alist me/original-fnha)
-              (setq gc-cons-threshold 800000))
-            99))
+(let ((.emacs.d user-emacs-directory))
+  (load (concat .emacs.d "lib.el"))
+  (dolist (file (directory-files (concat .emacs.d "semi-packaged/")
+                                 t "^\\w.*el$"))
+    (load file))
+  (load (concat .emacs.d "private.el"))
+  (load (concat .emacs.d "late-init.el"))
+  (load (setq custom-file (concat .emacs.d "custom.el"))))
 
 
-;;;; Preload lazy pkgs
+;;; After init
 
 (add-hook 'elpaca-after-init-hook
-          (lambda () (run-with-idle-timer 2 nil #'me/progressive-preload)))
+          (lambda ()
+            (run-with-idle-timer 2 nil #'me/progressively-preload)))
 
-(defun me/progressive-preload ()
+(defun me/progressively-preload ()
+  "Preload lazy packages in the background."
   (while-no-input
     (while-let ((next-lib (pop me/progressive-preload-queue)))
       (let ((inhibit-message t))
@@ -95,7 +86,7 @@
         (ignore-errors
           (require next-lib nil t)))))
   (if me/progressive-preload-queue
-      (run-with-idle-timer 2 nil #'me/progressive-preload)))
+      (run-with-idle-timer 2 nil #'me/progressively-preload)))
 
 (defvar me/progressive-preload-queue
   '(dired
@@ -122,6 +113,17 @@
     em-tramp
     em-unix
     em-xtra))
+
+;; Undo overrides from early-init.el
+(add-hook 'elpaca-after-init-hook
+          (lambda ()
+            (message "Init took %.2fs, post-init took %.2fs "
+                     (float-time (time-subtract after-init-time
+                                                before-init-time))
+                     (float-time (time-since after-init-time)))
+            (setq file-name-handler-alist me/original-fnha)
+            (setq gc-cons-threshold 800000))
+          99)
 
 ;; Local Variables:
 ;; no-byte-compile: t

@@ -1,13 +1,8 @@
 ;; -*- lexical-binding: t; -*-
 
-;; Even though I step through the buffer of the file of code, I shall fear no
-;; spaghetti, for Emacs is with me; Your lisp and Your documentation, they
-;; comfort me.
-
-
 ;;;; Packages
 
-;; Pkg dev libs
+;; Pkg dev
 (elpaca (unpackaged :repo "https://github.com/alphapapa/unpackaged.el"))
 (elpaca flycheck-package)
 (elpaca help-find)
@@ -23,9 +18,10 @@
 (elpaca (casual-dired :repo "https://github.com/kickingvegas/casual-dired"))
 (elpaca (combobulate :repo "https://github.com/mickeynp/combobulate"))
 (elpaca dogears)
-(elpaca drag-stuff)
 (elpaca tree-sitter)
 (elpaca tree-sitter-langs)
+(elpaca ranger)
+(elpaca (org-roam-daily-reflection :repo "https://github.com/emacsomancer/org-roam-daily-reflection"))
 
 ;; The rest
 (elpaca (ess-rproj :repo "https://github.com/chainsawriot/ess-rproj"))
@@ -34,6 +30,7 @@
 (elpaca academic-phrases)
 (elpaca backup-walker)
 (elpaca doom-themes)
+(elpaca drag-stuff)
 (elpaca ef-themes)
 (elpaca git-timemachine)
 (elpaca hacker-typer)
@@ -104,6 +101,997 @@
 ;; (elpaca vimgolf)
 ;; (elpaca visual-regexp)
 
+(use-package apheleia
+  :config
+  ;; (setopt apheleia-log-debug-info t)
+  (apheleia-global-mode))
+
+(use-package async
+  :after dired
+  :config
+  (dired-async-mode))
+
+(use-package asyncloop
+  :ensure (:repo "https://github.com/meedstrom/asyncloop")
+  :defer)
+
+;; TODO Get Doom's autorevert behavior for dired too
+(use-package autorevert
+  :ensure nil
+  :init
+
+  (add-hook 'focus-in-hook #'me/maybe-revert-visible-buffers)
+  (add-hook 'after-save-hook #'me/maybe-revert-visible-buffers)
+  (add-hook 'doom-switch-buffer-hook #'me/maybe-revert-buffer)
+  (add-hook 'doom-switch-window-hook #'me/maybe-revert-buffer)
+  (setq auto-revert-verbose t)
+  (setq auto-revert-use-notify nil)
+  (setq auto-revert-stop-on-user-input nil)
+  ;; Confirm before reverting buffer iff it's unsaved
+  (setq revert-without-query (list ".")))
+
+(use-package beginend
+  :config
+  (beginend-global-mode))
+
+(use-package calibredb
+  :defer
+  :config
+  (setopt calibredb-root-dir "~/Calibre Library/")
+  (setopt calibredb-db-dir (expand-file-name "metadata.db" calibredb-root-dir))
+  (setopt calibredb-format-width 8))
+
+(use-package copilot
+  :disabled
+  :defer
+  :hook (prog-mode . copilot-mode)
+  :bind (:map copilot-completion-map
+              ("<tab>" . 'copilot-accept-completion)
+              ("C-<tab>" . 'copilot-accept-completion-by-word)))
+
+(use-package cape
+  :after corfu
+  :config
+  ;; https://github.com/minad/corfu/wiki#configuring-corfu-for-eglot
+  (defun my/eglot-capf ()
+    (setq-local completion-at-point-functions
+                (list (cape-super-capf
+                       #'eglot-completion-at-point
+                       ;; #'tempel-expand
+                       #'cape-file))))
+  (add-hook 'eglot-managed-mode-hook #'my/eglot-capf))
+
+
+(use-package consult-dir
+  :defer
+  :config
+  (keymap-set global-map "C-x d" #'consult-dir))
+
+(use-package consult
+  :config
+  ;; hella weak computer
+  (setq consult-fontify-max-size 100000)
+  (setq consult-preview-partial-chunk 10000)
+  (setq consult-preview-partial-size 10000)
+  ;; Make narrowing help available in the minibuffer.  Try it one day.
+  ;; (define-key consult-narrow-map (vconcat consult-narrow-key "?") #'consult-narrow-help)
+  (setopt consult-narrow-key "<")
+
+  (after! vertico
+    (define-key vertico-map [S-up] #'vertico-previous)
+    (define-key vertico-map [S-down] #'vertico-next)
+    (consult-customize consult-recent-file :preview-key '("S-<up>" "S-<down>")))
+  (add-to-list 'consult-preview-variables '(org-inhibit-startup . t))
+  (define-key global-map [remap switch-to-buffer] #'consult-buffer)
+  ;; Don't ignore according to .gitignore, only according to .ignore
+  (setopt consult-ripgrep-args
+          (concat (custom--standard-value 'consult-ripgrep-args)
+                  " --no-ignore-vcs")))
+
+;; completion-at-point, TAB -> corfu-complete
+;; RET -> corfu-insert
+;; M-g -> corfu-show-location
+;; M-h -> corfu-show-documentation
+(use-package corfu
+  :config
+  (setopt corfu-quit-at-boundary nil)
+  (setopt tab-always-indent 'complete)
+  ;; (setopt corfu-auto t)
+  ;; (setopt corfu-auto-delay 0.35)
+  ;; (setopt tab-always-indent t) ;; Just bind `completion-at-point' to M-q
+  ;; (setopt completion-cycle-threshold 3)
+  ;; invoke corfu for dabbrev instead of its own dabbrev-expand
+  ;; (keymap-set [remap hippie-expand])
+  ;; (global-corfu-mode)
+
+  (advice-add #'corfu-insert :after #'me/corfu-send-shell)
+  (add-hook 'minibuffer-setup-hook #'me/corfu-enable-always-in-minibuffer 1)
+  (keymap-set corfu-map "SPC" #'me/complete-on-double-space)
+
+  ;; Complete on punctuation
+  ;; https://github.com/minad/corfu/wiki#tab-and-go-completion
+  (dolist (c (list (cons "." ".")
+                   (cons "," ",")
+                   (cons ":" ":")
+                   (cons ")" ")")
+                   (cons "}" "}")
+                   (cons "]" "]")))
+    (define-key corfu-map (kbd (car c)) `(lambda ()
+                                           (interactive)
+                                           (corfu-insert)
+                                           (insert ,(cdr c)))))
+  (global-corfu-mode))
+
+(use-package delve :disabled
+  :after org-roam
+  :config
+  (add-hook 'delve-mode-hook #'delve-compact-view-mode)
+  ;; It normally inherits from org-roam-title, which I find too big
+  (set-face-attribute 'delve-title-face () :inherit 'org-document-title))
+
+(use-package deianira
+  :ensure (:repo "https://github.com/meedstrom/deianira")
+  :defer
+  :config
+  (when (featurep 'which-key)
+    (which-key-mode 0)
+    (fset 'which-key-mode #'ignore))
+  (after! hydra
+    (define-key hydra-base-map (kbd "<f5>") #'hydra-repeat))
+  (setq dei-ignore "C-")
+
+  (setq dei-invisible-leafs
+        (seq-difference dei-invisible-leafs '("<menu>" "SPC"))))
+
+(use-package dired
+  :ensure nil
+  :defer
+  :init
+  (add-hook 'dired-mode-hook #'dired-hide-details-mode) ;; press ( to toggle
+  (setq dired-auto-revert-buffer #'dired-buffer-stale-p)
+  (setq dired-dwim-target t)
+  (setq dired-recursive-copies 'always)
+  (setq dired-recursive-deletes 'top)
+  (setq dired-create-destination-dirs 'ask)
+  (setq dired-hide-details-hide-symlink-targets nil)
+  (setq wdired-allow-to-change-permissions 'advanced)
+  (setq dired-listing-switches "-ahl -v --group-directories-first")
+  (setq global-auto-revert-non-file-buffers t)
+  :config
+  (require 'dired-x)
+  (setq dired-omit-verbose nil)
+  (setq dired-clean-confirm-killing-deleted-buffers nil)
+  (add-to-list 'dired-omit-extensions ".eshell-command-history")
+  (add-to-list 'dired-omit-extensions ".eshell-scrollback")
+  (require 'dired-aux)
+  (setq dired-create-destination-dirs 'ask)
+  (setq dired-vc-rename-file t))
+
+(use-package diredfl
+  :hook (dired-mode . diredfl-mode))
+
+;; show folder sizes (requires fs indexing with duc to be fast)
+(use-package dired-du :disabled
+  :when (and (executable-find "duc")
+             (not (string-match-p "Error" (my-process-output-to-string "duc" "info"))))
+  :config
+  (run-with-timer 60 3600
+                  (defun me/index-duc ()
+                    (start-process "duc" nil "duc" "index" "/home")))
+  (setopt dired-du-size-format t)  ;; human-readable
+  (setopt dired-du-used-space-program '("duc" "ls -bD")))
+
+(use-package dired-hacks :disabled
+  :init (add-hook 'dired-mode-hook #'dired-collapse-mode))
+
+;; NOTE: Try without for a while
+;; https://old.reddit.com/r/emacs/comments/1dcqdph/emacs_30_is_super_fast/l83uhas/
+(use-package eager-state
+  :ensure (:repo "https://github.com/meedstrom/eager-state")
+  :config
+  ;; (eager-state-preempt-kill-emacs-hook-mode)
+  ;; (advice-add #'kill-emacs :before (lambda (&rest _) (setq kill-emacs-hook nil)))
+  )
+
+(use-package editorconfig
+  :config
+  (editorconfig-mode))
+
+(use-package elfeed
+  :defer
+  :config
+  (setq elfeed-db-directory (concat user-emacs-directory "elfeed/db/")
+        elfeed-enclosure-default-dir (concat user-emacs-directory "elfeed/enclosures/"))
+  (make-directory elfeed-db-directory t)
+  (add-hook 'elfeed-new-entry-hook
+            (elfeed-make-tagger :entry-title (rx (or "MCMXXX"
+                                                     "A&R"))
+                                :add 'junk))
+  (setopt elfeed-curl-max-connections 1)
+  (setopt elfeed-search-filter "@2-months-ago -junk +unread"))
+
+(use-package elfeed-org
+  :after elfeed
+  :config
+  (setopt rmh-elfeed-org-files
+          '("/home/kept/roam/contemporaries.org"))
+  (elfeed-org))
+
+(use-package embark
+  :defer
+  :config
+  (setq embark-quit-after-action
+        '((me/load-theme . nil)
+          (t . t)))
+  (keymap-set embark-general-map "M-r" #'embark-isearch-backward)
+  (keymap-set embark-general-map "M-s" #'embark-isearch-forward))
+
+(use-package embark-consult
+  :defer)
+
+(use-package eshell
+  :ensure nil
+  :defer
+  :config
+  (require 'esh-module)
+  ;; Try some extra modules, see C-h P esh-groups
+  ;; (add-to-list 'eshell-modules-list 'eshell-smart)
+  (add-to-list 'eshell-modules-list 'eshell-xtra)
+
+  ;;   (require 'esh-mode)
+  ;;   (require 'em-hist))
+
+  (setopt eshell-prompt-function (lambda () "〈 ／／ 〉 "))
+  (setopt eshell-prompt-regexp "^〈 .*? 〉 ")
+  (setopt eshell-show-lisp-completions t)
+  (setopt eshell-scroll-show-maximum-output nil) ;; ??
+  (setopt eshell-scroll-to-bottom-on-output 'this)
+
+  ;; TODO I prefer it pick a recent buffer
+  ;; (setopt +eshell-enable-new-shell-on-split nil)
+
+  ;; TODO: give the different parts of the string different text properties
+  (setopt eshell-banner-message '(funcall #'me/esh-banner))
+
+  ;; (add-hook 'eshell-post-command-hook #'end-of-buffer)
+
+  (add-hook 'eshell-mode-hook
+            (defun my-esh-add-local-post-command-hook ()
+              (add-hook 'post-command-hook #'scroll-right nil t)))
+
+  ;; Sync history on every command, in case I powercycle the computer
+
+  (add-hook 'my-real-eshell-post-command-hook #'eshell-write-history)
+  (add-hook 'eshell-before-prompt-hook #'my-esh-save-scrollback)
+
+  ;; Name the buffer so I can see the directory on the modeline.
+  (add-hook 'eshell-directory-change-hook #'my-esh-rename)
+  (add-hook 'eshell-mode-hook #'my-esh-rename)
+
+  ;; Misc
+  ;; (add-hook 'my-real-eshell-post-command-hook #'my-esh-narrow-to-output 95)
+
+  ;; TODO: try the "smart" thing for a while
+  ;; (use-package em-smart
+  ;;   :custom ((eshell-review-quick-commands nil)
+  ;;            (eshell-smart-space-goes-to-end t)
+  ;;            (eshell-where-to-jump 'begin)))
+
+  (after! em-hist
+    (setopt eshell-hist-ignoredups t)
+    (define-key eshell-hist-mode-map [remap consult-history] #'my-esh-consult-history))
+
+  ;; (after! esh-mode
+  ;; Automatically narrow/widen to output on point motion.  Damn, it's weird
+  ;; and often not what I want, but that's me abusing point motion.
+  ;; (define-key eshell-mode-map [remap next-line] #'my-esh-next-line)
+  ;; (define-key eshell-mode-map [remap previous-line] #'my-esh-prev-line)
+  ;; (define-key eshell-mode-map [remap eshell-next-prompt] #'my-esh-next-prompt)
+  ;; (define-key eshell-mode-map [remap eshell-previous-prompt] #'my-esh-previous-prompt)
+  ;; )
+  )
+
+(use-package ess
+  :defer
+  :init (add-hook 'inferior-ess-mode-hook
+                  (lambda () (setq-local comint-scroll-to-bottom-on-input t)))
+  :config
+  (defun my-append-to-rhistory (input)
+    (with-temp-buffer
+      (insert (concat (format-time-string "《%FT%T%z》") input))
+      (kill-matching-buffers "^.Rhistory" nil t)
+      (quiet! (append-to-file (point-min) (point-max)
+                              (expand-file-name ".Rhistory" default-directory))))
+    input)
+
+  ;; ;; Make command `previous-buffer' not skip the R console
+  ;; (el-patch-defun doom-buffer-frame-predicate (buf)
+  ;;   "To be used as the default frame buffer-predicate parameter. Returns nil if
+  ;; BUF should be skipped over by functions like `next-buffer' and `other-buffer'."
+  ;;   (or (string-prefix-p "*R:" (buffer-name buf))
+  ;;       (doom-real-buffer-p buf)
+  ;;       (eq buf (doom-fallback-buffer))))
+
+  ;; http://chainsawriot.com/mannheim/2020/07/19/elisp.html
+
+  ;; (setopt ess-directory-function
+  ;;       (lambda ()
+  ;;         (or (ignore-errors (car (project-roots (project-current))))
+  ;;             nil)))
+
+  ;; (add-hook 'ess-presend-filter-functions #'my-append-to-rhistory)
+
+  ;; (defun my-set-rhistory (&rest r)
+  ;; (setq! ess-history-directory default-directory)
+  ;; (setq! ess-history-file ".Rhistory"))
+
+  ;; (advice-add #'ess-set-working-directory :after #'my-set-rhistory)
+
+  (setopt inferior-R-args "--no-save --no-restore")
+  (setopt ess-ask-for-ess-directory nil) ;; Muffle annoying ESS startup prompt
+  (setopt ess-use-ido nil)
+  (setopt ess-use-flymake nil)
+  (setopt ess-use-tracebug nil) ;; Sidestep a bug that destroys performance
+  (setopt ess-use-auto-complete nil)
+  (setopt ess-indent-with-fancy-comments nil)
+  (setopt ess-history-file nil)
+  (setopt ess-ask-for-ess-directory nil)
+  (setopt ess-eval-visibly 'nowait)
+  (me/unihook ess-r-mode-hook (ess-set-style 'RStudio)))
+
+(use-package eva
+  :ensure (:repo "/home/kept/emacs/eva" :branch "dev"
+                 :files (:defaults "assets" "renv" "*.R" "*.gnuplot"))
+  :init
+  :config
+  ;; (setopt eva-debug t)
+  (setopt eva-fallback-to-emacs-idle t)
+  (setopt eva-init-r nil)
+  (setopt eva-user-birthday "1991-12-07")
+  (setopt eva-idle-log-path         "/home/kept/self-data/idle.tsv")
+  (setopt eva-buffer-focus-log-path "/home/kept/self-data/buffer-focus.tsv")
+  (setopt eva-buffer-info-path      "/home/kept/self-data/buffer-info.tsv")
+  (setopt eva-main-datetree-path nil)
+  (setopt eva-past-sample-function #'eva-past-sample-casual)
+  (setopt ess-ask-for-ess-directory nil) ;; Prevent annoying ESS startup prompt
+  (require 'eva-builtin)
+  ;; Looked up by `eva-present-diary', but org-journal not needed
+  (setq org-journal-dir "/home/kept/roam/daily/")
+  (setq org-journal-file-format "%F")
+  ;; (setq org-journal-file-format "%F.org")
+  (add-hook 'eva-after-load-vars-hook #'eva-check-dangling-clock)
+  (add-hook 'eva-after-load-vars-hook #'eva-check-org-vars)
+  (eva-defun me/eva-present-outcomes-or-agenda ()
+    (require 'org-agenda)
+    (require 'org-id)
+    (message (eva-emit "Here are your Org'd thoughts."))
+    (sit-for eva-sit-short)
+    (if (> (ts-hour (ts-now)) 18)
+        ;; Late in the day is more of a review-time, so show agenda
+        (progn
+          (org-agenda-list)
+          (push (current-buffer) eva-excursion-buffers))
+      ;; Still early, so show desired outcomes and task ideas
+      (org-id-goto "3ec7f712-2437-4222-8905-72d39ba6188a")
+      (push (current-buffer) eva-excursion-buffers)
+      (if (one-window-p) (split-window))
+      (other-window 1)
+      (org-id-goto "c55ab064-0db2-4556-aa24-0c3c8dce9e76")
+      (push (current-buffer) eva-excursion-buffers))
+    (eva-stop-queue))
+  (setq eva-items
+        (list
+         (eva-item-create :fn #'eva-greet
+                          :min-hours-wait 1)
+
+         (eva-item-create :fn #'eva-present-diary
+                          :max-successes-per-day 1)
+
+         (eva-item-create :fn #'me/eva-present-outcomes-or-agenda)
+
+         ;; you can inline define the functions too
+         (eva-item-create
+          :fn (eva-defun my-bye ()
+                (message (eva-emit "All done for now."))
+                (bury-buffer (eva-buffer-chat)))
+          :min-hours-wait 0)))
+  (transient-replace-suffix 'eva-dispatch '(0)
+    '["General actions"
+      ("q" "Quit the chat" bury-buffer)
+      ("l" "View Ledger report" eva-present-ledger-report)
+      ("f" "View Ledger file" eva-present-ledger-file)
+      ("a" "View Org agenda" org-agenda-list)])
+  (define-key eva-chat-mode-map (kbd "l") #'eva-present-ledger-report)
+  (define-key eva-chat-mode-map (kbd "f") #'eva-present-ledger-file)
+  (define-key eva-chat-mode-map (kbd "a") #'org-agenda-list)
+  (eva-mode))
+
+(use-package exwm :disabled
+  :init
+  (setq exwm-input-simulation-keys
+        '(([?\s-a] . [home])
+          ([?\s-b] . [left])
+          ([?\s-d] . [delete])
+          ([?\s-e] . [end])
+          ([?\s-f] . [right])
+          ([?\s-g] . [escape])
+          ([?\s-k] . [S-end delete])
+          ([?\s-m] . [return])
+          ([?\s-n] . [down])
+          ([?\s-p] . [up])
+          ([?\s-s] . [C-f])
+          ([?\s-t] . [S-right C-x left C-v])
+          ([?\s-v] . [next])
+          ([?\s-w] . [C-x])
+          ([?\s-y] . [C-v])
+          ([?\s-/] . [C-z])
+          ([?\M-w] . [C-c])
+          ([?\M-d] . [C-S-right delete])
+          ([?\M-t] . [C-S-right C-x C-left C-v])
+          ([f8] . [menu])
+          ([XF86Back] . [prior])
+          ([XF86Forward] . [next])))
+  (setq exwm-input-prefix-keys
+        '(?\s-1 ?\s-2 ?\s-x ?\s-c menu f1 f2 f3 f5 f7 f10 f11 f12 katakana henkan))
+  (setq exwm-input-global-keys
+        `((,(kbd "C-M-<delete>") . exwm-reset)
+          (,(kbd "M-<f4>") . kill-current-buffer) ;; y u no work?
+          ;; (,(kbd "A-<f4>") . kill-current-buffer)
+          (,(kbd "<XF86MonBrightnessDown>") . my-backlight-dec)
+          (,(kbd "<XF86MonBrightnessUp>") . my-backlight-inc)))
+  (after! exwm-core
+    ;; Move C-c prefix to M-q so to clear C-c for copy
+    (keymap-set exwm-mode-map "M-q" (keymap-lookup exwm-mode-map "C-c"))
+    (keymap-unset exwm-mode-map "C-c"))
+  (add-hook 'exwm-update-class-hook #'my-exwm-rename-buffer)
+  (add-hook 'exwm-update-title-hook #'my-exwm-rename-buffer))
+
+(use-package fd-dired
+  :when (or (executable-find "fd") (executable-find "fdfind"))
+  :defer
+  :init
+  (global-set-key [remap find-dired] #'fd-dired))
+
+(use-package forge
+  :after magit)
+
+(use-package form-feed
+  :config
+  (global-form-feed-mode)
+  (add-hook 'emacs-lisp-compilation-mode-hook #'form-feed-mode))
+
+(use-package gcmh
+  :config
+  (setq gcmh-high-cons-threshold (* 15 1000 1000))
+  (gcmh-mode))
+
+(use-package goggles
+  :hook ((prog-mode text-mode) . goggles-mode))
+
+(use-package gif-screencast
+  :defer
+  :init
+  ;; Support KDE on Wayland
+  ;; (setq gif-screencast-program "spectacle")
+  ;; (setq gif-screencast-args (list "-anbo"))
+  )
+
+(use-package helm :disabled
+  :defer
+  :config
+  ;; wishlist: buffer preview
+  (setopt helm-ff-DEL-up-one-level-maybe t)
+  (when (modulep! :completion helm)
+    (define-key global-map [remap switch-to-buffer] #'helm-mini)))
+
+(use-package highlight-quoted
+  :defer
+  :init
+  (add-hook 'emacs-lisp-mode-hook #'highlight-quoted-mode))
+
+(use-package hl-todo
+  :defer
+  :init
+  (add-hook 'prog-mode-hook #'hl-todo-mode)
+  (add-hook 'yaml-mode-hook #'hl-todo-mode)
+  (setq hl-todo-highlight-punctuation ":"
+        hl-todo-keyword-faces
+        '(("TODO" warning bold)
+          ("FIXME" error bold)
+          ("REVIEW" font-lock-keyword-face bold)
+          ("HACK" font-lock-constant-face bold)
+          ("DEPRECATED" font-lock-doc-face bold)
+          ("NOTE" success bold)
+          ("BUG" error bold)
+          ("XXX" font-lock-constant-face bold))))
+
+(use-package hyperbole :disabled
+  :commands hkey-either
+  :init
+  ;; (run-with-idle-timer 15 nil #'hyperbole-mode)
+  (setq hkey-init nil))
+
+(use-package iedit
+  :defer
+  :init
+  ;; pre-bind the default key to silence init message
+  (keymap-set global-map "C-\;" #'iedit-mode))
+
+(use-package iflipb
+  :defer
+  :init
+  (setq iflipb-wrap-around t))
+
+;; maybe this is the one that subtly messes with undo?
+;; it may be messing with set-goal-column
+(use-package iscroll :disabled
+  :hook ((text-mode elfeed-show-mode eww-mode shr-mode) . iscroll-mode))
+
+(use-package inline-anki
+  :ensure (:repo "https://github.com/meedstrom/inline-anki")
+  :config
+  (setopt inline-anki-send-tags '(not "noexport"
+                                      "ARCHIVE"
+                                      "stub"
+                                      "fren"
+                                      "privy"
+                                      "pub"))
+  (after! org
+    (add-to-list 'org-structure-template-alist '("f" . "flashcard")))
+  (add-to-list 'inline-anki-fields '("Online mirror" . my-anki-field-for-webpage))
+  ;; (add-to-list 'inline-anki-ignore-file-regexps "/daily/")
+  )
+
+(use-package magit
+  :defer)
+
+(use-package marginalia
+  :config
+  (marginalia-mode))
+
+(use-package massmapper
+  :ensure (:repo "https://github.com/meedstrom/massmapper")
+  :demand
+  :init
+  (add-hook 'elpaca-after-init-hook #'massmapper-mode)
+  (add-hook 'massmapper-keymap-found-hook #'massmapper-define-super-like-ctl)
+  (add-hook 'massmapper-keymap-found-hook #'massmapper-homogenize -50)
+  ;; (add-hook 'massmapper-keymap-found-hook #'massmapper-protect-ret-and-tab -75)
+  (setopt massmapper-debug-level 0)
+  (setopt massmapper-homogenizing-winners
+          '(("C-x C-s" . global-map)
+            ("C-x C-f" . global-map)
+            ("C-x C-q" . global-map)
+            ("C-x C-;" . global-map)
+            ("C-x C-l" . global-map)
+            ("C-c l" . org-journal-mode-map)
+            ("C-c C-c")
+            ("C-c C-," . org-mode-map)))
+  :config
+  ;; (massmapper-mode)
+  )
+
+(use-package nameless
+  :defer
+  :init
+  (setopt nameless-prefix "⁓")
+  (setopt nameless-private-prefix t)
+  (setopt nameless-affect-indentation-and-filling nil)
+  :config
+  (set-face-attribute 'nameless-face nil :inherit 'unspecified))
+
+(use-package nov
+  :mode ("\\.epub\\'" . nov-mode))
+
+(use-package dropped-olivetti :disabled
+  :ensure (:repo "https://github.com/meedstrom/dropped-olivetti")
+  :config
+  (setq dropped-olivetti-style 'fancy)
+  (setq-default dropped-olivetti-body-width 81)
+  (dropped-olivetti-mode))
+
+(use-package objed
+  :commands objed-ipipe)
+
+(use-package org
+  :ensure nil
+  :defer
+  :init
+  (setq org-time-stamp-custom-formats (cons "%Y-%b-%d" "%Y-%m-%d %a %H:%M"))
+  (after! org
+    (setq org-time-stamp-formats (cons "%Y-%m-%d" "%Y-%m-%d %a %H:%M")))
+  (setq org-pretty-entities t)
+  (setq org-archive-location "/home/kept/roam/noagenda/archive.org::datetree/")
+  (setq org-clock-persist t)
+  (setq org-clock-auto-clock-resolution t)
+  (setq org-startup-folded 'nofold)
+  (setq citar-bibliography '("/home/kept/roam/refs/library_biblatex.bib"))
+  (setq org-archive-save-context-info '(time file itags olpath))
+  (setq org-export-backends '(html latex odt texinfo))
+  (setq org-export-with-toc nil)
+  (setq org-clock-out-remove-zero-time-clocks t)
+  (setq org-clock-idle-time 5)
+  (setq org-hide-leading-stars nil)
+  (setq org-clock-mode-line-total 'today)
+  (setq org-clock-in-resume t)
+  (setq org-catch-invisible-edits 'smart)
+  (setq org-ctrl-k-protect-subtree t)
+  (setq org-M-RET-may-split-line '((headline . nil) (default . t)))
+  (setq org-cycle-separator-lines 3)
+  (setq org-datetree-add-timestamp nil)
+  (setq org-edit-src-content-indentation 0)
+  ;; (setq org-ellipsis "⤵")
+  (setq org-ellipsis "…")
+  (setq org-hide-emphasis-markers t) ; hide the *, =, and / markers
+  (setq org-image-max-width 300)
+  ;; (setq org-image-actual-width '(200)) ; use #ATTR if available, else 200 px
+  ;; (setq org-latex-compiler "xelatex") ; allow unicode (åäö) in VERBATIM blocks
+  (setq org-log-done 'time)
+  (setq org-log-into-drawer t) ; hide spam
+  (setq org-modules '(org-id org-habit org-gamify ol-info ol-eww)) ;; `org-eww-copy-for-org-mode'
+  (setq org-use-speed-commands t)
+  (setq org-clock-x11idle-program-name (or (executable-find "xprintidle") "x11idle"))
+  (setq org-replace-disputed-keys t)
+  (setq org-tags-column 0)
+  (setq org-startup-indented t)
+  (setq org-download-heading-lvl nil)
+  (setq org-download-image-dir "img/")
+  (setq org-clock-kill-emacs-query nil) ;; fix bug
+
+
+  ;; Workaround the tide of org-element parser bugs since 9.5 rewrite
+  ;; (setq org-element-use-cache nil)
+  ;; (setq org-element-cache-persistent nil)
+
+  ;; Could it cause org-element bugs due to daily page titles?
+  ;; (setq-default org-display-custom-times t)
+
+  ;; For inline-anki: override Org's underlines to represent cloze deletions and
+  ;; make them look appropriate
+  (defface my-cloze '((t . (:box t))) "Cloze face")
+  (setq org-emphasis-alist '(("*" bold)
+                             ("/" italic)
+                             ("_" my-cloze)
+                             ("=" org-verbatim verbatim)
+                             ("~" org-code verbatim)
+                             ("+" (:strike-through t))))
+
+  (add-hook 'org-mode-hook #'me/org-setup-prettify)
+  ;; (add-hook 'org-mode-hook #'org-resolve-clocks 95)
+  ;; (add-hook 'org-mode-hook #'org-clock-persistence-insinuate)
+  ;; (add-hook 'org-clock-in-hook #'org-clock-save)
+  ;; (add-hook 'org-clock-out-hook #'bh/clock-out-maybe 90)
+  ;; (add-hook 'text-mode-hook #'turn-off-smartparens-mode)
+
+  (after! ox-latex
+    ;; Prettify code-snippets in exported pdf.
+    (setopt org-latex-listings t)
+    (setopt org-latex-listings-options '(("basicstyle" "\\small"))) ; small code font
+    (add-to-list 'org-latex-packages-alist '("" "listings"))
+    (add-to-list 'org-latex-packages-alist '("" "booktabs"))
+    ;; Add letter class so I can... write a cover letter. yup, my life
+    (add-to-list 'org-latex-classes
+                 '("letter"
+                   "\\documentclass[11pt]{letter}"
+                   ("\\section{%s}" . "\\section*{%s}")
+                   ("\\subsection{%s}" . "\\subsection*{%s}")
+                   ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+                   ("\\paragraph{%s}" . "\\paragraph*{%s}")
+                   ("\\subparagraph{%s}" . "\\subparagraph*{%s}"))))
+  :config
+  (unless after-init-time
+    (setq debug-on-error t)
+    (message "Org loaded during init, I don't want this"))
+
+  ;; If using Doom's Org
+  (if (and (boundp 'doom-version)
+           (modulep! :lang org))
+      ;; fix interference with org-transclusion
+      (advice-remove 'org-link-search '+org--recenter-after-follow-link-a)
+    ;; if not using Doom's org
+    ;; (require 'org-indent)
+    ;; (add-hook 'org-mode-hook #'org-indent-mode)
+    (my-change-latex-scale) ;; Bigger LaTeX preview
+    ;; Adapt LaTeX preview scale to the font zoom
+    (add-hook 'text-scale-mode-hook #'my-change-latex-scale))
+  )
+
+(use-package org-agenda
+  :ensure nil
+  :defer
+  :init
+  ;; (setq org-agenda-todo-list-sublevels nil)
+  (setq org-agenda-include-diary nil) ;; perf... :(
+  (setq org-agenda-dim-blocked-tasks nil) ;; perf
+  (setq org-agenda-use-tag-inheritance '(todo search)) ;; perf
+  (setq org-agenda-ignore-properties '(stats)) ;; perf
+  (setq org-agenda-inhibit-startup t) ;; perf
+  ;; (setopt org-babel-load-languages '((R . t)
+  ;;                                    (emacs-lisp . t)
+  ;;                                    (calc . t)
+  ;;                                    (ditaa . t)
+  ;;                                    (sqlite . t)
+  ;;                                    (dot . t)))
+  ;; (setopt org-agenda-prefix-format '((agenda . " %i %-12:c%?-12t% s")
+  ;;                                    (todo . " %i %-32b") ;; have breadcrumbs
+  ;;                                    (tags . " %i %-12:c")
+  ;;                                    (search . " %i %-12:c")))
+  ;; (setopt org-agenda-custom-commands '(("b" todo "NEXT")
+  ;;                                      ("w" todo "WAITING")
+  ;;                                      ("p" todo "PROCRASTINATING")
+  ;;                                      ("c" tags-todo "+active")))
+  ;; (setopt org-agenda-tag-filter-preset '("-exclude"))
+  )
+
+(use-package org-journal :disabled
+  :config
+  (add-hook 'org-journal-after-header-create-hook #'org-node-nodeify-entry)
+  (add-hook 'org-journal-mode-hook
+            (lambda ()
+              (setq outline-regexp (rx (or bos (seq (+ "*") " "))))))
+  (setq org-journal-dir "/home/kept/roam/daily")
+  (setq org-journal-file-format "%Y-%m-%d.org")
+  (setq org-journal-date-prefix "#+title: ")
+  (setq org-journal-date-format "%Y-%b-%d")
+  (setq org-journal-time-prefix "* ")
+  ;; (setq org-journal-time-format "")
+  )
+
+;; (use-package org-node-fakeroam
+;;   :ensure (:repo "/home/kept/emacs/org-node" :branch "dev"
+;;            :files (:defaults
+;;                    "org-node-fakeroam.el"
+;;                    (:exclude "org-node.el"
+;;                              "org-node-parser.el"
+;;                              "org-node-obsolete.el"
+;;                              "org-node-backlink.el"))))
+
+(use-package org-node-fakeroam
+  :after org-node
+  :requires org-node
+  :ensure (:repo "/home/kept/emacs/org-node" :branch "dev"
+                 :files ("org-node-fakeroam.el")))
+
+(use-package org-node
+  :ensure (:repo "/home/kept/emacs/org-node" :branch "dev"
+                 :files (:defaults (:exclude "org-node-fakeroam.el")))
+  :after org
+  :config
+  (setq org-roam-directory "/home/kept/roam/")
+  (setq org-node-extra-id-dirs '("/home/kept/roam/" "/home/me/.doom.d/"))
+  (add-hook 'after-save-hook 'org-node-rename-file-by-title)
+  (setq org-node-renames-allowed-dirs '("/home/kept/roam/"))
+  ;; (setq org-node--debug nil)
+  ;; (setopt org-node-perf-eagerly-update-link-tables t)
+  ;; (setopt org-node-perf-assume-coding-system 'utf-8-auto-unix)
+  ;; (setopt org-node-ask-directory "/home/kept/roam")
+  ;; (setopt org-node-prefer-with-heading t)
+  ;; (setopt org-node-slug-fn #'org-node-slugify-like-roam-default)
+  ;; (setopt org-node-datestamp-format "%Y%m%dT%H%M%S--")
+  ;; (setopt org-node-slug-fn #'org-node-slugify-for-web)
+  (setq org-node-creation-fn #'org-capture)
+  ;; (setopt org-node-creation-fn #'org-node-new-via-roam-capture)
+  ;; (setopt org-node-creation-fn #'org-node-new-file)
+  ;; (setopt org-node-alter-candidates t)
+  (setq org-node-filter-fn
+        (lambda (node)
+          (not
+           (or (string-search "archive/" (org-node-get-file-path node))
+               (string-search "noagenda/" (org-node-get-file-path node))))))
+
+  (add-hook 'org-roam-mode-hook #'visual-line-mode)
+  (add-hook 'org-roam-mode-hook #'org-indent-mode)
+
+  (org-node-cache-mode)
+  (org-node-complete-at-point-mode)
+  (org-node-backlink-global-mode)
+  (org-node-fakeroam-nosql-mode)
+  (org-node-fakeroam-db-feed-mode)
+  (org-node-fakeroam-redisplay-mode)
+
+  ;; Make sure the extracted subtree inherits any CREATED property,
+  ;; else creates one for today
+  (advice-add 'org-node-extract-subtree :around
+              (defun my-inherit-creation-date (orig-fn &rest args)
+                (let ((parent-creation (org-entry-get nil "CREATED" t)))
+                  (apply orig-fn args)
+                  ;; Now in the new buffer
+                  (org-entry-put nil "CREATED"
+                                 (or parent-creation
+                                     (format-time-string
+                                      (org-time-stamp-format nil t)))))))
+  (add-to-list 'org-node-series
+               '("c"
+                 :name "All nodes by creation-time"
+                 :classifier
+                 (let ((tbl (make-hash-table :test #'equal)))
+                   (lambda (node)
+                     (let* ((raw (cdr (assoc "CREATED"
+                                             (org-node-get-properties node))))
+                            (date (if raw (substring raw 1 11)))
+                            (count (length (gethash date tbl))))
+                       (when date
+                         (push count (gethash date tbl))
+                         (cons (concat date ":::" count)
+                               (org-node-get-id node))))))
+                 :whereami
+                 (lambda ()
+                   (or (org-entry-get nil "CREATED" t)))
+                 :prompter org-read-date)))
+
+;; (defun org-node--string->eqkey (str)
+;;   "Turn STR into an unique integer."
+;;   (string-to-number
+;;    (string-join (mapcar #'number-to-string (string-to-list str)))))
+
+;; (sxhash-eq "d")
+;; (sxhash-equal "a")
+;; (sxhash "a b")
+;; (eq '(33 35) '(33 35))
+;; (char-to-string 35)
+
+(use-package org-noter :disabled
+  :init
+  (add-hook 'org-noter-notes-mode-hook #'abbrev-mode)
+  (add-hook 'org-noter-notes-mode-hook (lambda () rainbow-delimiters-mode 0)))
+
+(use-package org-roam
+  :defer
+  :init
+  (add-hook 'org-roam-capture-new-node-hook #'org-node-put-created)
+  (setopt org-roam-file-exclude-regexp '("logseq/bak/" "logseq/version-files/"))
+  (setopt org-roam-link-auto-replace nil)
+  (setopt org-roam-db-update-on-save nil)
+  (setopt org-roam-directory "/home/kept/roam/")
+  (setopt org-roam-dailies-directory "daily/")
+  (setopt org-roam-ui-browser-function #'my-browse-url-chromium-kiosk)
+  (setopt org-roam-dailies-capture-templates
+          `(("d" "default" entry "* %<%H:%M>\n%?" :if-new
+             (file+head "%<%Y-%m-%d>.org"
+                        ,(lines "#+title: %<%Y-%b-%d>"
+                                "#+filetags: :noexport:daily:"))
+             :immediate-finish t
+             :jump-to-captured t)))
+
+  :config
+  (add-hook 'me/load-theme-hook
+            (defun my-theme-mod-roam ()
+              ;; For backlinks buffer
+              (set-face-attribute 'org-roam-title nil :height 1.5)))
+  ;; When I have a fresh thought, avoid distraction by any earlier stuff I
+  ;; wrote (ADHD)
+  (after! org-roam-dailies
+    (advice-add 'org-roam-dailies-capture-today :after
+                (defun my-recenter-top (&rest args)
+                  (recenter 0)
+                  args))))
+
+(use-package org-transclusion
+  :defer
+  :config
+  (set-face-background 'org-transclusion "#222")
+  (setopt org-transclusion-exclude-elements '(property-drawer comment keyword)))
+
+(use-package quickroam
+  :ensure (:repo "https://github.com/meedstrom/quickroam")
+  :defer)
+
+(use-package prism
+  :defer
+  ;; Wishlist: an odd default for Lisp is that the parens enclosing a sexp
+  ;; differ in color from the symbols inside -- I'd like it the same color
+  :init
+  (setq prism-comments nil)
+  ;; The default (40 50 60) is a nice fix for fruit-salad themes but if the
+  ;; theme already uses muted colors, the effect is... not good
+  (setq prism-desaturations '(0 20 60))
+  :config
+  (add-hook 'me/load-theme-hook #'prism-set-colors)
+  ;; (add-hook 'web-mode-hook #'prism-mode) ;; infinite loop in .svelte files
+  (add-hook 'typescript-mode-hook #'prism-mode)
+  (add-hook 'typescript-tsx-mode-hook #'prism-mode)
+  (add-hook 'js-base-mode-hook #'prism-mode))
+
+(use-package smartparens
+  :config ;; y u no autoloads
+  ;; Smartparens guide: https://gist.github.com/pvik/8eb5755cc34da0226e3fc23a320a3c95
+  ;; Author's config: https://github.com/Fuco1/.emacs.d/blob/master/files/smartparens.el
+  ;; Xah's simplification: https://old.reddit.com/r/emacs/comments/3sfmkz/could_this_be_a_pareditsmartparens_killer/cwxocld/
+  (require 'smartparens-config)
+  (setq sp-highlight-pair-overlay nil
+        sp-highlight-wrap-overlay nil
+        sp-highlight-wrap-tag-overlay nil)
+  (add-hook #'emacs-lisp-mode-hook #'smartparens-mode)
+  (keymap-set smartparens-strict-mode-map ";" #'sp-comment)
+  (keymap-set global-map "C-<left>" #'sp-forward-barf-sexp)
+  (keymap-set global-map "C-<right>" #'sp-forward-slurp-sexp)
+  (keymap-set global-map "C-M-<left>" #'sp-backward-slurp-sexp)
+  (keymap-set global-map "C-M-<right>" #'sp-backward-barf-sexp)
+  (define-key global-map [remap kill-whole-line] #'sp-kill-whole-line)
+
+  ;; In agreement with the Doom module
+  (keymap-set global-map "M-<backspace>" #'sp-backward-unwrap-sexp)
+  (keymap-set global-map "M-<delete>" #'sp-unwrap-sexp)
+  (keymap-set global-map "C-M-b" #'sp-backward-sexp)
+  (keymap-set global-map "C-M-f" #'sp-forward-sexp)
+  (keymap-set global-map "C-M-d" #'sp-down-sexp)
+  (keymap-set global-map "C-M-n" #'sp-next-sexp)
+  (keymap-set global-map "C-M-p" #'sp-previous-sexp)
+  (keymap-set global-map "C-M-t" #'sp-transpose-sexp)
+
+  ;; Don't bind sp-kill-sexp in global-map
+  ;; https://github.com/Fuco1/smartparens/issues/1186
+  (keymap-set smartparens-mode-map "C-M-k" #'sp-kill-sexp)
+
+  (add-hook 'read-only-mode-hook #'turn-off-smartparens-mode)
+
+  ;; Still haven't really used these
+  (keymap-set global-map "C-M-a" #'sp-backward-down-sexp)
+  (keymap-set smartparens-mode-map "C-k" #'sp-kill-hybrid-sexp)
+  (keymap-set global-map "C-M-e" #'sp-up-sexp)
+  (keymap-set global-map "C-M-u" #'sp-backward-up-sexp)
+  (keymap-set global-map "C-'" #'sp-mark-sexp)
+  ;; (keymap-set global-map "C-;" #'sp-comment)
+  (keymap-set global-map "M-[" #'sp-wrap-round)
+
+  ;; Unassimilated Smartparens commands to try out.
+  ;; (keymap-set global-map "C-M-<delete>" #'sp-splice-sexp-killing-forward)
+  ;; (keymap-set global-map "C-M-<backspace>" #'sp-splice-sexp-killing-backward)
+  ;; (keymap-set global-map "C-2 a" #'sp-join-sexp)
+  ;; (keymap-set global-map "C-2 b" #'sp-select-next-thing)
+  ;; (keymap-set global-map "C-2 c" #'sp-beginning-of-sexp)
+  ;; (keymap-set global-map "C-2 d" #'sp-beginning-of-next-sexp)
+  ;; (keymap-set global-map "C-2 e" #'sp-end-of-sexp)
+  ;; (keymap-set global-map "C-2 f" #'sp-add-to-next-sexp)
+  ;; (keymap-set global-map "C-2 g" #'sp-add-to-previous-sexp)
+  ;; (keymap-set global-map "C-2 h" #'sp-split-sexp)
+  ;; (keymap-set global-map "C-2 i" #'sp-splice-sexp)
+  ;; (keymap-set global-map "C-2 j" #'sp-emit-sexp)
+  ;; (keymap-set global-map "C-2 k" #'sp-absorb-sexp)
+  ;; (keymap-set global-map "C-2 l" #'sp-convolute-sexp)
+  ;; (keymap-set global-map "C-2 m" #'sp-forward-symbol)
+  ;; (keymap-set global-map "C-2 n" #'sp-backward-symbol)
+  ;; (keymap-set global-map "C-2 o" #'sp-wrap)
+  ;; (keymap-set global-map "C-2 p" #'sp-backward-up-sexp)
+  ;; (keymap-set global-map "C-2 q" #'sp-up-sexp)
+  ;; (keymap-set global-map "C-2 r" #'sp-select-next-thing-exchange)
+  ;; (keymap-set global-map "C-2 s" #'sp-select-previous-thing)
+  )
+
+(use-package svelte-mode)
+
+;; Magit requires high transient version but elpaca did not install it
+(setq elpaca-ignored-dependencies
+      (delq 'transient elpaca-ignored-dependencies))
+
+;; (use-package transient)
+
+(use-package orderless
+  :config
+  (setopt completion-styles '(orderless basic))
+  (add-to-list 'orderless-style-dispatchers
+               #'me/handle-initialism-first-pattern))
+
+(use-package vertico
+  :config
+  ;; (keymap-set vertico-map "<tab>" #'embark-act-with-completing-read)
+  (setopt vertico-cycle t)
+  (setopt vertico-count 14)
+  (setopt vertico-resize nil)
+  (add-hook 'rfn-eshadow-update-overlay-hook #'vertico-directory-tidy)
+  (add-hook 'minibuffer-setup-hook #'vertico-repeat-save)
+  (define-key vertico-map [remap delete-backward-char]
+              #'vertico-directory-delete-char)
+  (vertico-mode))
+
+(use-package ws-butler
+  :config
+  ;; Fix problem with guix.el
+  (add-to-list 'ws-butler-global-exempt-modes #'minibuffer-inactive-mode)
+  ;; Fix for org because the org-element parser throws hella warnings since 9.5
+  ;; (add-to-list 'ws-butler-global-exempt-modes #'org-mode)
+  (ws-butler-global-mode))
+
 
 ;;; Backups
 (setopt
@@ -141,9 +1129,39 @@
 
 
 
+;;; Doom ideas
+
+(defun doom-run-switch-window-or-frame-hooks-h (&optional _)
+  (let ((gc-cons-threshold most-positive-fixnum)
+        (inhibit-redisplay t))
+    (unless (equal (old-selected-frame) (selected-frame))
+      (run-hooks 'doom-switch-frame-hook))
+    (unless (or (minibufferp)
+                (equal (old-selected-window) (minibuffer-window)))
+      (run-hooks 'doom-switch-window-hook))))
+
+(defun doom-run-switch-buffer-hooks-h (&optional _)
+  (let ((gc-cons-threshold most-positive-fixnum)
+        (inhibit-redisplay t))
+    (run-hooks 'doom-switch-buffer-hook)))
+
+(my-hook-once 'elpaca-after-init-hook
+  (add-hook 'window-selection-change-functions #'doom-run-switch-window-or-frame-hooks-h)
+  (add-hook 'window-buffer-change-functions #'doom-run-switch-buffer-hooks-h)
+  ;; `window-buffer-change-functions' doesn't run for server-visited files
+  (add-hook 'server-visit-hook #'doom-run-switch-buffer-hooks-h))
+
+
 ;;; Font
 
 (set-face-font 'default (font-spec :family "Iosevka Nerd Font" :size 33))
+;; (progn
+;;   (set-face-font 'default (font-spec :family "Iosevka Nerd Font" :size 66))
+;;   (setq vertico-count 7))
+
+;; for recording
+;; (set-face-font 'default (font-spec :family "Iosevka Nerd Font" :size 16))
+;; (set-frame-width nil 160)
 
 ;; For my Surface Pro screen (2736x1824).  Here are the respective fonts'
 ;; maximum size that still let me split the screen into two 80-column panes.
@@ -173,8 +1191,8 @@
 
 (fset #'display-startup-echo-area-message #'ignore)
 (setq inhibit-startup-screen t)
-(recentf-mode)
 (blink-cursor-mode 0)
+(recentf-mode)
 (savehist-mode)
 (save-place-mode)
 (column-number-mode)
@@ -233,6 +1251,7 @@
 (setq undo-limit (* 4 1000 1000)) ;; 4 MB (default 160 kB)
 (setq undo-strong-limit (* 6 1000 1000))
 (setq ring-bell-function #'ignore)
+(setq sentence-end-double-space nil) ;; But see `my-fill-unfill-respect-double-space'
 (setq gnus-select-method '(nntp "news.eternal-september.org"))
 (setq byte-compile-warnings '(not free-vars))
 (setq kill-whole-line t) ;; TIL after 9 years of emacs
@@ -478,10 +1497,11 @@
 (keymap-set global-map "M-/" #'dabbrev-completion)
 (keymap-set global-map "M-1" #'switch-to-buffer)
 (keymap-set global-map "M-2" #'my-other-window-any-frame-hyprland)
-(keymap-set global-map "M-;" #'embark-act)
+(keymap-set global-map "C-r" #'embark-act)
 (keymap-set global-map "M-<backspace>" #'sp-backward-unwrap-sexp)
 (keymap-set global-map "M-<delete>" #'sp-unwrap-sexp)
 (keymap-set global-map "M-<down>" #'drag-stuff-down)
+(keymap-set global-map "M-<f3>" #'kill-current-buffer)
 (keymap-set global-map "M-<f4>" #'kill-current-buffer) ;; EXWM
 (keymap-set global-map "M-<insert>" #'sp-rewrap-sexp)
 (keymap-set global-map "M-<up>" #'drag-stuff-up)
@@ -537,6 +1557,7 @@
 (keymap-set global-map "M-o f" #'org-node-find)
 (keymap-set global-map "M-o h" #'consult-find)
 (keymap-set global-map "M-o i" #'org-node-insert-link)
+(keymap-set global-map "M-o n" #'org-node-nodeify-entry)
 (keymap-set global-map "M-o l" #'helm-locate)
 (keymap-set global-map "M-o p" #'my-spawn-process)
 (keymap-set global-map "M-o r" #'vertico-repeat)
@@ -782,911 +1803,6 @@
 ;;   (especially when you use vertico-buffer-mode so you only get half screen
 ;;   width).  How to fix?
 
-(use-package apheleia
-  :config
-  ;; (setopt apheleia-log-debug-info t)
-  (apheleia-global-mode))
-
-(use-package async
-  :after dired
-  :config
-  (dired-async-mode))
-
-(use-package asyncloop
-  :ensure (:repo "https://github.com/meedstrom/asyncloop")
-  :defer)
-
-;; TODO Get Doom's autorevert behavior for dired too
-(use-package autorevert
-  :ensure nil
-  :init
-  (add-hook 'focus-in-hook #'me/maybe-revert-visible-buffers)
-  (add-hook 'after-save-hook #'me/maybe-revert-visible-buffers)
-  (add-hook 'doom-switch-buffer-hook #'me/maybe-revert-buffer)
-  (add-hook 'doom-switch-window-hook #'me/maybe-revert-buffer)
-  (setq auto-revert-verbose t)
-  (setq auto-revert-use-notify nil)
-  (setq auto-revert-stop-on-user-input nil)
-  ;; Confirm before reverting buffer iff it's unsaved
-  (setq revert-without-query (list ".")))
-
-(use-package beginend
-  :config
-  (beginend-global-mode))
-
-(use-package calibredb
-  :defer
-  :config
-  (setopt calibredb-root-dir "~/Calibre Library/")
-  (setopt calibredb-db-dir (expand-file-name "metadata.db" calibredb-root-dir))
-  (setopt calibredb-format-width 8))
-
-(use-package copilot
-  :disabled
-  :defer
-  :hook (prog-mode . copilot-mode)
-  :bind (:map copilot-completion-map
-              ("<tab>" . 'copilot-accept-completion)
-              ("C-<tab>" . 'copilot-accept-completion-by-word)))
-
-(use-package cape
-  :after corfu
-  :config
-  ;; https://github.com/minad/corfu/wiki#configuring-corfu-for-eglot
-  (defun my/eglot-capf ()
-    (setq-local completion-at-point-functions
-                (list (cape-super-capf
-                       #'eglot-completion-at-point
-                       ;; #'tempel-expand
-                       #'cape-file))))
-  (add-hook 'eglot-managed-mode-hook #'my/eglot-capf))
-
-
-(use-package consult-dir
-  :defer
-  :config
-  (keymap-set global-map "C-x d" #'consult-dir))
-
-(use-package consult
-  :config
-  ;; hella weak computer
-  (setq consult-fontify-max-size 100000) 
-  (setq consult-preview-partial-chunk 10000)
-  (setq consult-preview-partial-size 10000)
-  ;; Make narrowing help available in the minibuffer.  Try it one day.
-  ;; (define-key consult-narrow-map (vconcat consult-narrow-key "?") #'consult-narrow-help)
-  (setopt consult-narrow-key "<")
-
-  (after! vertico
-    (define-key vertico-map [S-up] #'vertico-previous)
-    (define-key vertico-map [S-down] #'vertico-next)
-    (consult-customize consult-recent-file :preview-key '("S-<up>" "S-<down>")))
-  (add-to-list 'consult-preview-variables '(org-inhibit-startup . t))
-  (define-key global-map [remap switch-to-buffer] #'consult-buffer)
-  ;; Don't ignore according to .gitignore, only according to .ignore
-  (setopt consult-ripgrep-args
-          (concat (custom--standard-value 'consult-ripgrep-args)
-                  " --no-ignore-vcs")))
-
-;; completion-at-point, TAB -> corfu-complete
-;; RET -> corfu-insert
-;; M-g -> corfu-show-location
-;; M-h -> corfu-show-documentation
-(use-package corfu
-  :config
-  (setopt corfu-quit-at-boundary nil)
-  (setopt tab-always-indent 'complete)
-  ;; (setopt corfu-auto t)
-  ;; (setopt corfu-auto-delay 0.35)
-  ;; (setopt tab-always-indent t) ;; Just bind `completion-at-point' to M-q
-  ;; (setopt completion-cycle-threshold 3)
-  ;; invoke corfu for dabbrev instead of its own dabbrev-expand
-  ;; (keymap-set [remap hippie-expand])
-  ;; (global-corfu-mode)
-
-  (advice-add #'corfu-insert :after #'me/corfu-send-shell)
-  (add-hook 'minibuffer-setup-hook #'me/corfu-enable-always-in-minibuffer 1)
-  (keymap-set corfu-map "SPC" #'me/complete-on-double-space)
-
-  ;; Complete on punctuation
-  ;; https://github.com/minad/corfu/wiki#tab-and-go-completion
-  (dolist (c (list (cons "." ".")
-                   (cons "," ",")
-                   (cons ":" ":")
-                   (cons ")" ")")
-                   (cons "}" "}")
-                   (cons "]" "]")))
-    (define-key corfu-map (kbd (car c)) `(lambda ()
-                                           (interactive)
-                                           (corfu-insert)
-                                           (insert ,(cdr c)))))
-  (global-corfu-mode))
-
-(use-package delve :disabled
-  :after org-roam
-  :config
-  (add-hook 'delve-mode-hook #'delve-compact-view-mode)
-  ;; It normally inherits from org-roam-title, which I find too big
-  (set-face-attribute 'delve-title-face () :inherit 'org-document-title))
-
-(use-package deianira
-  :ensure (:repo "https://github.com/meedstrom/deianira")
-  :defer
-  :config
-  (when (featurep 'which-key)
-    (which-key-mode 0)
-    (fset 'which-key-mode #'ignore))
-  (after! hydra
-    (define-key hydra-base-map (kbd "<f5>") #'hydra-repeat))
-  (setq dei-ignore "C-")
-  (setq dei-invisible-leafs
-        (seq-difference dei-invisible-leafs '("<menu>" "SPC"))))
-
-(use-package dired
-  :ensure nil
-  :defer
-  :init
-  (add-hook 'dired-mode-hook #'dired-hide-details-mode) ;; press ( to toggle
-  (setq dired-auto-revert-buffer #'dired-buffer-stale-p)
-  (setq dired-dwim-target t)
-  (setq dired-recursive-copies 'always)
-  (setq dired-recursive-deletes 'top)
-  (setq dired-create-destination-dirs 'ask)
-  (setq dired-hide-details-hide-symlink-targets nil)
-  (setq wdired-allow-to-change-permissions 'advanced)
-  (setq dired-listing-switches "-ahl -v --group-directories-first")
-  (setq global-auto-revert-non-file-buffers t)
-  :config
-  (require 'dired-x)
-  (setq dired-omit-verbose nil)
-  (setq dired-clean-confirm-killing-deleted-buffers nil)
-  (add-to-list 'dired-omit-extensions ".eshell-command-history")
-  (add-to-list 'dired-omit-extensions ".eshell-scrollback")
-  (require 'dired-aux)
-  (setq dired-create-destination-dirs 'ask)
-  (setq dired-vc-rename-file t))
-
-(use-package diredfl
-  :hook (dired-mode . diredfl-mode))
-
-;; show folder sizes (requires fs indexing with duc to be fast)
-(use-package dired-du :disabled
-  :when (and (executable-find "duc")
-             (not (string-match-p "Error" (my-process-output-to-string "duc" "info"))))
-  :config
-  (run-with-timer 60 3600 
-                  (defun me/index-duc ()
-                    (start-process "duc" nil "duc" "index" "/home")))
-  (setopt dired-du-size-format t)  ;; human-readable
-  (setopt dired-du-used-space-program '("duc" "ls -bD")))
-
-(use-package dired-hacks :disabled
-  :init (add-hook 'dired-mode-hook #'dired-collapse-mode))
-
-;; NOTE: Try without for a while
-;; https://old.reddit.com/r/emacs/comments/1dcqdph/emacs_30_is_super_fast/l83uhas/
-(use-package eager-state
-  :ensure (:repo "https://github.com/meedstrom/eager-state")
-  :config
-  ;; (eager-state-preempt-kill-emacs-hook-mode)
-  ;; (advice-add #'kill-emacs :before (lambda (&rest _) (setq kill-emacs-hook nil)))
-  )
-
-(use-package editorconfig
-  :config
-  (editorconfig-mode))
-
-(use-package elfeed
-  :defer
-  :config
-  (setq elfeed-db-directory (concat user-emacs-directory "elfeed/db/")
-        elfeed-enclosure-default-dir (concat user-emacs-directory "elfeed/enclosures/"))
-  (make-directory elfeed-db-directory t)
-  (add-hook 'elfeed-new-entry-hook
-            (elfeed-make-tagger :entry-title (rx (or "MCMXXX"
-                                                     "A&R"))
-                                :add 'junk))
-  (setopt elfeed-curl-max-connections 1)
-  (setopt elfeed-search-filter "@2-months-ago -junk +unread"))
-
-(use-package elfeed-org
-  :after elfeed
-  :config
-  (setopt rmh-elfeed-org-files
-          '("/home/kept/roam/contemporaries.org"))
-  (elfeed-org))
-
-(use-package embark
-  :defer
-  :init
-  (setq embark-quit-after-action
-        '((me/load-theme . nil)
-          (t . t))))
-
-(use-package embark-consult
-  :defer)
-
-(use-package eshell
-  :ensure nil
-  :defer
-  :config
-  (require 'esh-module)
-  ;; Try some extra modules, see C-h P esh-groups
-  ;; (add-to-list 'eshell-modules-list 'eshell-smart)
-  (add-to-list 'eshell-modules-list 'eshell-xtra)
-
-  ;;   (require 'esh-mode)
-  ;;   (require 'em-hist))
-
-  (setopt eshell-prompt-function (lambda () "〈 ／／ 〉 "))
-  (setopt eshell-prompt-regexp "^〈 .*? 〉 ")
-  (setopt eshell-show-lisp-completions t)
-  (setopt eshell-scroll-show-maximum-output nil) ;; ??
-  (setopt eshell-scroll-to-bottom-on-output 'this)
-
-  ;; TODO I prefer it pick a recent buffer
-  ;; (setopt +eshell-enable-new-shell-on-split nil)
-
-  ;; TODO: give the different parts of the string different text properties
-  (setopt eshell-banner-message '(funcall #'me/esh-banner))
-
-  ;; (add-hook 'eshell-post-command-hook #'end-of-buffer)
-
-  (add-hook 'eshell-mode-hook
-            (defun my-esh-add-local-post-command-hook ()
-              (add-hook 'post-command-hook #'scroll-right nil t)))
-
-  ;; Sync history on every command, in case I powercycle the computer
-
-  (add-hook 'my-real-eshell-post-command-hook #'eshell-write-history)
-  (add-hook 'eshell-before-prompt-hook #'my-esh-save-scrollback)
-
-  ;; Name the buffer so I can see the directory on the modeline.
-  (add-hook 'eshell-directory-change-hook #'my-esh-rename)
-  (add-hook 'eshell-mode-hook #'my-esh-rename)
-
-  ;; Misc
-  ;; (add-hook 'my-real-eshell-post-command-hook #'my-esh-narrow-to-output 95)
-
-  ;; TODO: try the "smart" thing for a while
-  ;; (use-package em-smart
-  ;;   :custom ((eshell-review-quick-commands nil)
-  ;;            (eshell-smart-space-goes-to-end t)
-  ;;            (eshell-where-to-jump 'begin)))
-
-  (after! em-hist
-    (setopt eshell-hist-ignoredups t)
-    (define-key eshell-hist-mode-map [remap consult-history] #'my-esh-consult-history))
-
-  ;; (after! esh-mode
-  ;; Automatically narrow/widen to output on point motion.  Damn, it's weird
-  ;; and often not what I want, but that's me abusing point motion.
-  ;; (define-key eshell-mode-map [remap next-line] #'my-esh-next-line)
-  ;; (define-key eshell-mode-map [remap previous-line] #'my-esh-prev-line)
-  ;; (define-key eshell-mode-map [remap eshell-next-prompt] #'my-esh-next-prompt)
-  ;; (define-key eshell-mode-map [remap eshell-previous-prompt] #'my-esh-previous-prompt)
-  ;; )
-  )
-
-(use-package ess
-  :defer
-  :init (add-hook 'inferior-ess-mode-hook
-                  (lambda () (setq-local comint-scroll-to-bottom-on-input t)))
-  :config
-  (defun my-append-to-rhistory (input)
-    (with-temp-buffer
-      (insert (concat (format-time-string "《%FT%T%z》") input))
-      (kill-matching-buffers "^.Rhistory" nil t)
-      (quiet! (append-to-file (point-min) (point-max)
-                              (expand-file-name ".Rhistory" default-directory))))
-    input)
-  
-  ;; ;; Make command `previous-buffer' not skip the R console
-  ;; (el-patch-defun doom-buffer-frame-predicate (buf)
-  ;;   "To be used as the default frame buffer-predicate parameter. Returns nil if
-  ;; BUF should be skipped over by functions like `next-buffer' and `other-buffer'."
-  ;;   (or (string-prefix-p "*R:" (buffer-name buf))
-  ;;       (doom-real-buffer-p buf)
-  ;;       (eq buf (doom-fallback-buffer))))
-
-  ;; http://chainsawriot.com/mannheim/2020/07/19/elisp.html
-
-  ;; (setopt ess-directory-function
-  ;;       (lambda ()
-  ;;         (or (ignore-errors (car (project-roots (project-current))))
-  ;;             nil)))
-
-  ;; (add-hook 'ess-presend-filter-functions #'my-append-to-rhistory)
-
-  ;; (defun my-set-rhistory (&rest r)
-  ;; (setq! ess-history-directory default-directory)
-  ;; (setq! ess-history-file ".Rhistory"))
-
-  ;; (advice-add #'ess-set-working-directory :after #'my-set-rhistory)
-
-  (setopt inferior-R-args "--no-save --no-restore")
-  (setopt ess-ask-for-ess-directory nil) ;; Muffle annoying ESS startup prompt
-  (setopt ess-use-ido nil)
-  (setopt ess-use-flymake nil)
-  (setopt ess-use-tracebug nil) ;; Sidestep a bug that destroys performance
-  (setopt ess-use-auto-complete nil)
-  (setopt ess-indent-with-fancy-comments nil)
-  (setopt ess-history-file nil)
-  (setopt ess-ask-for-ess-directory nil)
-  (setopt ess-eval-visibly 'nowait)
-  (me/unihook ess-r-mode-hook (ess-set-style 'RStudio)))
-
-(use-package eva
-  :ensure (:repo "https://github.com/meedstrom/eva"
-                 :files (:defaults "assets" "renv" "*.R" "*.gnuplot"))
-  :init
-  :config
-  ;; (setopt eva-debug t)
-  (setopt eva-fallback-to-emacs-idle t)
-  (setopt eva-init-r nil)
-  (setopt eva-user-birthday "1991-12-07")
-  (setopt eva-idle-log-path         "/home/kept/self-data/idle.tsv")
-  (setopt eva-buffer-focus-log-path "/home/kept/self-data/buffer-focus.tsv")
-  (setopt eva-buffer-info-path      "/home/kept/self-data/buffer-info.tsv")
-  (setopt eva-past-sample-function #'eva-past-sample-casual)
-  (setopt ess-ask-for-ess-directory nil) ;; Prevent annoying ESS startup prompt
-  (require 'eva-builtin)
-  ;; Looked up by `eva-present-diary', but org-journal not needed
-  (setq org-journal-dir "/home/kept/roam/daily/")
-  ;; (setq org-journal-file-format "%F.org")
-  (add-hook 'eva-after-load-vars-hook #'eva-check-dangling-clock)
-  (add-hook 'eva-after-load-vars-hook #'eva-check-org-vars)
-  (eva-defun me/eva-present-outcomes-or-agenda ()
-    (require 'org-agenda)
-    (require 'org-id)
-    (message (eva-emit "Here are your Org'd thoughts."))
-    (sit-for eva-sit-short)
-    (if (> (ts-hour (ts-now)) 18)
-        ;; Late in the day is more of a review-time, so show agenda
-        (progn
-          (org-agenda-list)
-          (push (current-buffer) eva-excursion-buffers))
-      ;; Still early, so show desired outcomes and task ideas
-      (org-id-goto "3ec7f712-2437-4222-8905-72d39ba6188a")
-      (push (current-buffer) eva-excursion-buffers)
-      (if (one-window-p) (split-window))
-      (other-window 1)
-      (org-id-goto "c55ab064-0db2-4556-aa24-0c3c8dce9e76")
-      (push (current-buffer) eva-excursion-buffers))
-    (eva-stop-queue))
-  (setq eva-items
-        (list
-         (eva-item-create :fn #'eva-greet
-                          :min-hours-wait 1)
-
-         (eva-item-create :fn #'eva-present-diary
-                          :max-successes-per-day 1)
-
-         (eva-item-create :fn #'me/eva-present-outcomes-or-agenda)
-
-         ;; you can inline define the functions too
-         (eva-item-create
-          :fn (eva-defun my-bye ()
-                (message (eva-emit "All done for now."))
-                (bury-buffer (eva-buffer-chat)))
-          :min-hours-wait 0)))
-  (transient-replace-suffix 'eva-dispatch '(0)
-    '["General actions"
-      ("q" "Quit the chat" bury-buffer)
-      ("l" "View Ledger report" eva-present-ledger-report)
-      ("f" "View Ledger file" eva-present-ledger-file)
-      ("a" "View Org agenda" org-agenda-list)])
-  (define-key eva-chat-mode-map (kbd "l") #'eva-present-ledger-report)
-  (define-key eva-chat-mode-map (kbd "f") #'eva-present-ledger-file)
-  (define-key eva-chat-mode-map (kbd "a") #'org-agenda-list)
-  (eva-mode))
-
-(use-package exwm :disabled
-  :init
-  (setq exwm-input-simulation-keys
-        '(([?\s-a] . [home])
-          ([?\s-b] . [left])
-          ([?\s-d] . [delete])
-          ([?\s-e] . [end])
-          ([?\s-f] . [right])
-          ([?\s-g] . [escape])
-          ([?\s-k] . [S-end delete])
-          ([?\s-m] . [return])
-          ([?\s-n] . [down])
-          ([?\s-p] . [up])
-          ([?\s-s] . [C-f])
-          ([?\s-t] . [S-right C-x left C-v])
-          ([?\s-v] . [next])
-          ([?\s-w] . [C-x])
-          ([?\s-y] . [C-v])
-          ([?\s-/] . [C-z])
-          ([?\M-w] . [C-c])
-          ([?\M-d] . [C-S-right delete])
-          ([?\M-t] . [C-S-right C-x C-left C-v])
-          ([f8] . [menu])
-          ([XF86Back] . [prior])
-          ([XF86Forward] . [next])))
-  (setq exwm-input-prefix-keys
-        '(?\s-1 ?\s-2 ?\s-x ?\s-c menu f1 f2 f3 f5 f7 f10 f11 f12 katakana henkan))
-  (setq exwm-input-global-keys
-        `((,(kbd "C-M-<delete>") . exwm-reset)
-          (,(kbd "M-<f4>") . kill-current-buffer) ;; y u no work?
-          ;; (,(kbd "A-<f4>") . kill-current-buffer)
-          (,(kbd "<XF86MonBrightnessDown>") . my-backlight-dec)
-          (,(kbd "<XF86MonBrightnessUp>") . my-backlight-inc)))
-  (after! exwm-core
-    ;; Move C-c prefix to M-q so to clear C-c for copy
-    (keymap-set exwm-mode-map "M-q" (keymap-lookup exwm-mode-map "C-c"))
-    (keymap-unset exwm-mode-map "C-c"))
-  (add-hook 'exwm-update-class-hook #'my-exwm-rename-buffer)
-  (add-hook 'exwm-update-title-hook #'my-exwm-rename-buffer))
-
-(use-package fd-dired
-  :when (or (executable-find "fd") (executable-find "fdfind"))
-  :defer
-  :init
-  (global-set-key [remap find-dired] #'fd-dired))
-
-(use-package forge
-  :after magit)
-
-(use-package form-feed
-  :config
-  (global-form-feed-mode)
-  (add-hook 'emacs-lisp-compilation-mode-hook #'form-feed-mode))
-
-(use-package gcmh
-  :config
-  (setq gcmh-high-cons-threshold (* 15 1000 1000))
-  (gcmh-mode))
-
-(use-package goggles
-  :hook ((prog-mode text-mode) . goggles-mode))
-
-(use-package gif-screencast
-  :defer
-  :init
-  ;; Support KDE on Wayland
-  ;; (setq gif-screencast-program "spectacle")
-  ;; (setq gif-screencast-args (list "-anbo"))
-  )
-
-(use-package helm :disabled
-  :defer
-  :config
-  ;; wishlist: buffer preview
-  (setopt helm-ff-DEL-up-one-level-maybe t)
-  (when (modulep! :completion helm)
-    (define-key global-map [remap switch-to-buffer] #'helm-mini)))
-
-(use-package highlight-quoted
-  :defer
-  :init
-  (add-hook 'emacs-lisp-mode-hook #'highlight-quoted-mode))
-
-(use-package hl-todo
-  :defer
-  :init
-  (add-hook 'prog-mode-hook #'hl-todo-mode)
-  (add-hook 'yaml-mode-hook #'hl-todo-mode)
-  (setq hl-todo-highlight-punctuation ":"
-        hl-todo-keyword-faces
-        '(;; nabbed from doom
-          ("TODO" warning bold)
-          ("FIXME" error bold)
-          ("REVIEW" font-lock-keyword-face bold)
-          ("HACK" font-lock-constant-face bold)
-          ("DEPRECATED" font-lock-doc-face bold)
-          ("NOTE" success bold)
-          ("BUG" error bold)
-          ("XXX" font-lock-constant-face bold))))
-
-(use-package hyperbole
-  :commands hkey-either
-  :init
-  ;; (run-with-idle-timer 15 nil #'hyperbole-mode) ;; Slows vertico on my 1GHz
-  (setq hkey-init nil))
-
-(use-package iedit)
-
-(use-package iflipb
-  :defer
-  :init
-  (setq iflipb-wrap-around t))
-
-;; maybe this is the one that subtly messes with undo?
-(use-package iscroll
-  :hook ((text-mode elfeed-show-mode eww-mode shr-mode) . iscroll-mode))
-
-(use-package inline-anki
-  :ensure (:repo "https://github.com/meedstrom/inline-anki")
-  :config
-  (setopt inline-anki-send-tags '(not "noexport"
-                                      "ARCHIVE"
-                                      "stub"
-                                      "fren"
-                                      "privy"
-                                      "pub"))
-  (after! org
-    (add-to-list 'org-structure-template-alist '("f" . "flashcard")))
-  (add-to-list 'inline-anki-fields '("Online mirror" . my-anki-field-for-webpage))
-  (add-to-list 'inline-anki-ignore-file-regexps "/daily/"))
-
-(use-package magit
-  :defer)
-
-(use-package marginalia
-  :config
-  (marginalia-mode))
-
-(use-package massmapper
-  :ensure (:repo "https://github.com/meedstrom/massmapper")
-  :demand
-  :init
-  (add-hook 'elpaca-after-init-hook #'massmapper-mode)
-  (add-hook 'massmapper-keymap-found-hook #'massmapper-define-super-like-ctl)
-  (add-hook 'massmapper-keymap-found-hook #'massmapper-homogenize -50)
-  ;; (add-hook 'massmapper-keymap-found-hook #'massmapper-protect-ret-and-tab -75)
-  (setopt massmapper-debug-level 0)
-  (setopt massmapper-homogenizing-winners
-          '(("C-x C-s" . global-map)
-            ("C-x C-f" . global-map)
-            ("C-x C-q" . global-map)
-            ("C-x C-;" . global-map)
-            ("C-x C-l" . global-map)
-            ("C-c C-c")
-            ("C-c C-," . org-mode-map)))
-  :config
-  (massmapper-mode))
-
-(use-package nameless
-  :defer
-  :init
-  (setopt nameless-prefix "⁓")
-  (setopt nameless-private-prefix t)
-  (setopt nameless-affect-indentation-and-filling nil)
-  :config
-  (set-face-attribute 'nameless-face nil :inherit 'unspecified))
-
-(use-package nov
-  :mode ("\\.epub\\'" . nov-mode))
-
-(use-package dropped-olivetti :disabled
-  :ensure (:repo "https://github.com/meedstrom/dropped-olivetti")
-  :config
-  (setq dropped-olivetti-style 'fancy)
-  (setq-default dropped-olivetti-body-width 81)
-  (dropped-olivetti-mode))
-
-(use-package objed
-  :commands objed-ipipe)
-
-(use-package org
-  :ensure nil
-  :defer
-  :init
-  (setq org-timestamp-custom-formats '("%Y-%b-%d" . "%Y-%m-%d %a %H:%M"))
-  (setq org-pretty-entities t)
-  (setq org-archive-location "/home/kept/roam/noagenda/archive.org::datetree/")
-  (setq org-clock-persist t)
-  (setq org-clock-auto-clock-resolution t)
-  ;; (setq org-startup-folded 'nofold)
-  (setq citar-bibliography '("/home/kept/roam/refs/library_biblatex.bib"))
-  (setq org-archive-save-context-info '(time file itags olpath))
-  (setq org-export-backends '(html latex odt texinfo))
-  (setq org-export-with-toc nil)
-  (setq org-timestamp-formats (cons "%Y-%m-%d" "%Y-%m-%d %a %H:%M"))
-  (setq org-clock-out-remove-zero-time-clocks t)
-  (setq org-clock-idle-time 5)
-  (setq org-hide-leading-stars nil)
-  (setq org-clock-mode-line-total 'today)
-  (setq org-clock-in-resume t)
-  (setq org-catch-invisible-edits 'smart)
-  (setq org-ctrl-k-protect-subtree t)
-  (setq org-M-RET-may-split-line '((headline . nil) (default . t)))
-  (setq org-cycle-separator-lines 3)
-  (setq org-datetree-add-timestamp nil)
-  (setq org-edit-src-content-indentation 0)
-  ;; (setq org-ellipsis "⤵")
-  (setq org-ellipsis "…")
-  (setq org-hide-emphasis-markers t) ; hide the *, =, and / markers
-  (setq org-image-max-width 300)
-  ;; (setq org-image-actual-width '(200)) ; use #ATTR if available, else 200 px
-  ;; (setq org-latex-compiler "xelatex") ; allow unicode (åäö) in VERBATIM blocks
-  (setq org-log-done 'time)
-  (setq org-log-into-drawer t) ; hide spam
-  (setq org-modules '(org-id org-habit org-gamify ol-info ol-eww)) ;; `org-eww-copy-for-org-mode'
-  (setq org-use-speed-commands t)
-  (setq org-clock-x11idle-program-name (or (executable-find "xprintidle") "x11idle"))
-  (setq org-replace-disputed-keys t)
-  (setq org-tags-column 0)
-  (setq org-startup-indented t)
-  (setq org-download-heading-lvl nil)
-  (setq org-download-image-dir "img/")
-  (setq org-clock-kill-emacs-query nil) ;; fix bug
-
-
-  ;; Workaround the tide of org-element parser bugs since 9.5 rewrite
-  ;; (setq org-element-use-cache nil)
-  ;; (setq org-element-cache-persistent nil)
-
-  ;; Could it cause org-element bugs due to daily page titles?
-  ;; (setq-default org-display-custom-times t)
-  
-  ;; For inline-anki: override Org's underlines to represent cloze deletions and
-  ;; make them look appropriate
-  (defface my-cloze '((t . (:box t))) "Cloze face")
-  (setq org-emphasis-alist '(("*" bold)
-                             ("/" italic)
-                             ("_" my-cloze)
-                             ("=" org-verbatim verbatim)
-                             ("~" org-code verbatim)
-                             ("+" (:strike-through t))))
-
-  (add-hook 'org-mode-hook #'me/org-setup-prettify)
-  ;; (add-hook 'org-mode-hook #'org-resolve-clocks 95)
-  ;; (add-hook 'org-mode-hook #'org-clock-persistence-insinuate)
-  ;; (add-hook 'org-clock-in-hook #'org-clock-save)
-  ;; (add-hook 'org-clock-out-hook #'bh/clock-out-maybe 90)
-  ;; (add-hook 'text-mode-hook #'turn-off-smartparens-mode)
-
-  (after! ox-latex
-    ;; Prettify code-snippets in exported pdf.
-    (setopt org-latex-listings t)
-    (setopt org-latex-listings-options '(("basicstyle" "\\small"))) ; small code font
-    (add-to-list 'org-latex-packages-alist '("" "listings"))
-    (add-to-list 'org-latex-packages-alist '("" "booktabs"))
-    ;; Add letter class so I can... write a cover letter. yup, my life
-    (add-to-list 'org-latex-classes
-                 '("letter"
-                   "\\documentclass[11pt]{letter}"
-                   ("\\section{%s}" . "\\section*{%s}")
-                   ("\\subsection{%s}" . "\\subsection*{%s}")
-                   ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
-                   ("\\paragraph{%s}" . "\\paragraph*{%s}")
-                   ("\\subparagraph{%s}" . "\\subparagraph*{%s}"))))
-  :config
-  (unless after-init-time
-    (setq debug-on-error t)
-    (message "Org loaded during init, I don't want this"))
-  
-  ;; If using Doom's Org
-  (if (and (boundp 'doom-version)
-           (modulep! :lang org))
-      ;; fix interference with org-transclusion
-      (advice-remove 'org-link-search '+org--recenter-after-follow-link-a)
-    ;; if not using Doom's org
-    ;; (require 'org-indent)
-    ;; (add-hook 'org-mode-hook #'org-indent-mode)
-    (my-change-latex-scale) ;; Bigger LaTeX preview
-    ;; Adapt LaTeX preview scale to the font zoom
-    (add-hook 'text-scale-mode-hook #'my-change-latex-scale))
-  )
-
-(use-package org-agenda
-  :ensure nil
-  :defer
-  :init
-  ;; (setq org-agenda-todo-list-sublevels nil)
-  (setq org-agenda-include-diary nil) ;; perf... :(
-  (setq org-agenda-dim-blocked-tasks nil) ;; perf
-  (setq org-agenda-use-tag-inheritance '(todo search)) ;; perf
-  (setq org-agenda-ignore-properties '(stats)) ;; perf
-  (setq org-agenda-inhibit-startup t) ;; perf
-  ;; (setopt org-babel-load-languages '((R . t)
-  ;;                                    (emacs-lisp . t)
-  ;;                                    (calc . t)
-  ;;                                    (ditaa . t)
-  ;;                                    (sqlite . t)
-  ;;                                    (dot . t)))
-  ;; (setopt org-agenda-prefix-format '((agenda . " %i %-12:c%?-12t% s")
-  ;;                                    (todo . " %i %-32b") ;; have breadcrumbs
-  ;;                                    (tags . " %i %-12:c")
-  ;;                                    (search . " %i %-12:c")))
-  ;; (setopt org-agenda-custom-commands '(("b" todo "NEXT")
-  ;;                                      ("w" todo "WAITING")
-  ;;                                      ("p" todo "PROCRASTINATING")
-  ;;                                      ("c" tags-todo "+active")))
-  ;; (setopt org-agenda-tag-filter-preset '("-exclude"))
-  )
-
-(use-package org-node
-  :ensure (:repo "/home/kept/emacs/org-node" :branch "dev")
-  :after org
-  :config
-  (setq org-roam-directory "/home/kept/roam/")
-  ;; (setq org-node--debug nil)
-  (setopt org-node-extra-id-dirs '("/home/kept/roam/" "/home/me/.doom.d/"))
-  ;; (setopt org-node-eagerly-update-link-tables t)
-  ;; (setopt org-node-perf-assume-coding-system 'utf-8-auto-unix)
-  ;; (setopt org-node-ask-directory "/home/kept/roam")
-  (setopt org-node-prefer-with-heading nil)
-  ;; (setopt org-node-slug-fn #'org-node-slugify-like-roam-default)
-  ;; (setopt org-node-datestamp-format "%Y%m%dT%H%M%S--")
-  (setopt org-node-datestamp-format "")
-  (add-hook 'after-save-hook 'org-node-rename-file-by-title-maybe)
-  (setopt org-node-slug-fn #'org-node-slugify-for-web)
-  ;; (setopt org-node-creation-fn #'org-node-new-via-roam-capture)
-  ;; (setopt org-node-creation-fn #'org-node-new-file)
-  (setopt org-node-creation-fn #'org-capture)
-  ;; (setopt org-node-alter-candidates t)
-  (setopt org-node-filter-fn
-          (lambda (node)
-            (not
-             (or (string-search "archive/" (org-node-get-file-path node))
-                 (string-search "noagenda/" (org-node-get-file-path node))))))
-
-  (org-node-cache-mode)
-  (org-node-complete-at-point-mode)
-  (org-node-backlink-global-mode)
-  (org-node-fakeroam-nosql-mode)
-  (org-node-fakeroam-redisplay-mode)
-
-  ;; Make sure the extracted subtree inherits any CREATED property,
-  ;; else creates one for today
-  (advice-add 'org-node-extract-subtree :around
-              (defun my-inherit-creation-date (orig-fn &rest args)
-                (let ((parent-creation (org-entry-get nil "CREATED" t)))
-                  (apply orig-fn args)
-                  ;; Now in the new buffer
-                  (org-entry-put nil "CREATED"
-                                 (or parent-creation
-                                     (format-time-string "[%F %a]")))))))
-
-(use-package org-noter :disabled
-  :init
-  (add-hook 'org-noter-notes-mode-hook #'abbrev-mode)
-  (add-hook 'org-noter-notes-mode-hook (lambda () rainbow-delimiters-mode 0)))
-
-(use-package org-roam
-  :defer
-  :init
-  (add-hook 'org-roam-capture-new-node-hook #'org-node-put-created)
-  (setopt org-roam-file-exclude-regexp '("logseq/bak/" "logseq/version-files/"))
-  (setopt org-roam-link-auto-replace nil)
-  (setopt org-roam-db-update-on-save nil)
-  (setopt org-roam-directory "/home/kept/roam/")
-  (setopt org-roam-extract-new-file-path "${slug}.org")
-  (setopt org-roam-ui-browser-function #'my-browse-url-chromium-kiosk)
-  (setopt org-roam-dailies-capture-templates
-          `(("d" "default" entry "* %<%H:%M>\n%?" :if-new
-             (file+head "%<%Y-%m-%d>.org"
-                        ,(lines "#+title: %<%Y-%m-%d>"
-                                "#+filetags: :noexport:daily:"))
-             :immediate-finish t
-             :jump-to-captured t)))
-  
-  :config
-  (add-hook 'me/load-theme-hook
-            (defun my-theme-mod-roam ()
-              ;; For backlinks buffer
-              (set-face-attribute 'org-roam-title nil :height 1.5)))
-  ;; When I have a fresh thought, avoid distraction by any earlier stuff I
-  ;; wrote (ADHD)
-  (after! org-roam-dailies
-    (advice-add 'org-roam-dailies-capture-today :after
-                (defun my-recenter-top (&rest args)
-                  (recenter 0)
-                  args))))
-
-(use-package org-transclusion
-  :defer
-  :config
-  (set-face-background 'org-transclusion "#222")
-  (setopt org-transclusion-exclude-elements '(property-drawer comment keyword)))
-
-(use-package quickroam :disabled
-  :ensure (:repo "https://github.com/meedstrom/quickroam")
-  :defer)
-
-(use-package prism
-  :defer
-  ;; Wishlist: an odd default for Lisp is that the parens enclosing a sexp
-  ;; differ in color from the symbols inside -- I'd like it the same color
-  :init
-  (setq prism-comments nil)
-  ;; The default (40 50 60) is a nice fix for fruit-salad themes but if the
-  ;; theme already uses muted colors, the effect is... not good
-  (setq prism-desaturations '(0 20 60))
-  :config
-  (add-hook 'me/load-theme-hook #'prism-set-colors)
-  ;; (add-hook 'web-mode-hook #'prism-mode) ;; infinite loop in .svelte files
-  (add-hook 'typescript-mode-hook #'prism-mode)
-  (add-hook 'typescript-tsx-mode-hook #'prism-mode)
-  (add-hook 'js-base-mode-hook #'prism-mode))
-
-(use-package smartparens
-  :config ;; y u no autoloads
-  ;; Smartparens guide: https://gist.github.com/pvik/8eb5755cc34da0226e3fc23a320a3c95
-  ;; Author's config: https://github.com/Fuco1/.emacs.d/blob/master/files/smartparens.el
-  ;; Xah's simplification: https://old.reddit.com/r/emacs/comments/3sfmkz/could_this_be_a_pareditsmartparens_killer/cwxocld/
-  (require 'smartparens-config)
-  (add-hook #'emacs-lisp-mode-hook #'smartparens-mode)
-  (keymap-set smartparens-strict-mode-map ";" #'sp-comment)
-  (keymap-set global-map "C-<left>" #'sp-forward-barf-sexp)
-  (keymap-set global-map "C-<right>" #'sp-forward-slurp-sexp)
-  (keymap-set global-map "C-M-<left>" #'sp-backward-slurp-sexp)
-  (keymap-set global-map "C-M-<right>" #'sp-backward-barf-sexp)
-  (define-key global-map [remap kill-whole-line] #'sp-kill-whole-line)
-  
-  ;; In agreement with the Doom module
-  (keymap-set global-map "M-<backspace>" #'sp-backward-unwrap-sexp)
-  (keymap-set global-map "M-<delete>" #'sp-unwrap-sexp)
-  (keymap-set global-map "C-M-b" #'sp-backward-sexp)
-  (keymap-set global-map "C-M-f" #'sp-forward-sexp)
-  (keymap-set global-map "C-M-d" #'sp-down-sexp)
-  (keymap-set global-map "C-M-n" #'sp-next-sexp)
-  (keymap-set global-map "C-M-p" #'sp-previous-sexp)
-  (keymap-set global-map "C-M-t" #'sp-transpose-sexp)
-
-  ;; Don't bind sp-kill-sexp in global-map
-  ;; https://github.com/Fuco1/smartparens/issues/1186
-  (keymap-set smartparens-mode-map "C-M-k" #'sp-kill-sexp)
-
-  ;; Still haven't really used these
-  (keymap-set global-map "C-M-a" #'sp-backward-down-sexp)
-  (keymap-set smartparens-mode-map "C-k" #'sp-kill-hybrid-sexp)
-  (keymap-set global-map "C-M-e" #'sp-up-sexp)
-  (keymap-set global-map "C-M-u" #'sp-backward-up-sexp)
-  (keymap-set global-map "C-'" #'sp-mark-sexp)
-  ;; (keymap-set global-map "C-;" #'sp-comment)
-  (keymap-set global-map "M-[" #'sp-wrap-round)
-  
-  ;; Unassimilated Smartparens commands to try out.
-  ;; (keymap-set global-map "C-M-<delete>" #'sp-splice-sexp-killing-forward)
-  ;; (keymap-set global-map "C-M-<backspace>" #'sp-splice-sexp-killing-backward)
-  ;; (keymap-set global-map "C-2 a" #'sp-join-sexp)
-  ;; (keymap-set global-map "C-2 b" #'sp-select-next-thing)
-  ;; (keymap-set global-map "C-2 c" #'sp-beginning-of-sexp)
-  ;; (keymap-set global-map "C-2 d" #'sp-beginning-of-next-sexp)
-  ;; (keymap-set global-map "C-2 e" #'sp-end-of-sexp)
-  ;; (keymap-set global-map "C-2 f" #'sp-add-to-next-sexp)
-  ;; (keymap-set global-map "C-2 g" #'sp-add-to-previous-sexp)
-  ;; (keymap-set global-map "C-2 h" #'sp-split-sexp)
-  ;; (keymap-set global-map "C-2 i" #'sp-splice-sexp)
-  ;; (keymap-set global-map "C-2 j" #'sp-emit-sexp)
-  ;; (keymap-set global-map "C-2 k" #'sp-absorb-sexp)
-  ;; (keymap-set global-map "C-2 l" #'sp-convolute-sexp)
-  ;; (keymap-set global-map "C-2 m" #'sp-forward-symbol)
-  ;; (keymap-set global-map "C-2 n" #'sp-backward-symbol)
-  ;; (keymap-set global-map "C-2 o" #'sp-wrap)
-  ;; (keymap-set global-map "C-2 p" #'sp-backward-up-sexp)
-  ;; (keymap-set global-map "C-2 q" #'sp-up-sexp)
-  ;; (keymap-set global-map "C-2 r" #'sp-select-next-thing-exchange)
-  ;; (keymap-set global-map "C-2 s" #'sp-select-previous-thing)
-  )
-
-;; Magit requires high transient version but elpaca did not install it
-(setq elpaca-ignored-dependencies
-      (delq 'transient elpaca-ignored-dependencies))  
-
-;; (use-package transient)
-
-(use-package orderless
-  :config
-  (setopt completion-styles '(orderless basic))
-  (add-to-list 'orderless-style-dispatchers
-               #'me/handle-initialism-first-pattern))
-
-(use-package vertico
-  :config
-  ;; (keymap-set vertico-map "<tab>" #'embark-act-with-completing-read)
-  (setopt vertico-cycle t)
-  (setopt vertico-count 17)
-  (setopt vertico-resize nil)
-  (add-hook 'rfn-eshadow-update-overlay-hook #'vertico-directory-tidy)  
-  (add-hook 'minibuffer-setup-hook #'vertico-repeat-save)
-  (define-key vertico-map [remap delete-backward-char]
-              #'vertico-directory-delete-char)
-  (vertico-mode))
-
-(use-package ws-butler
-  :config
-  ;; Fix problem with guix.el
-  (add-to-list 'ws-butler-global-exempt-modes #'minibuffer-inactive-mode)
-  ;; Fix for org because the org-element parser throws hella warnings since 9.5
-  (add-to-list 'ws-butler-global-exempt-modes #'org-mode)
-  (ws-butler-global-mode))
 
 
 ;;;; Life-organization essentials 2024-06-06
@@ -1747,8 +1863,12 @@
          :prepend t
          )
 
-        ("n" "ID node"
+        ("n" "Capture into ID node"
          plain (function org-node-capture-target) nil
+         :empty-lines-after 1)
+
+        ("d" "Daily"
+         plain (function org-node--daily-capture-target) nil
          :empty-lines-after 1)
 
         ("v" "Visit ID node"
@@ -1869,5 +1989,13 @@
 ;; When closing and reopening Emacs often (esp with 2+ simultaneous instances),
 ;; ALL THE TIME things missing from recentf.  Becaus the design implements no
 ;; crash-only principles.
-;; (add-to-list 'recentf-used-hooks '(find-file-hook recentf-save-list 90))
-(advice-add #'recentf-track-opened-file :after #'recentf-save-list)
+;; (advice-add #'recentf-track-opened-file :after #'recentf-save-list)
+;; ... now it saves backupfiles~ because of not running the kill-hook
+;; `recentf-track-closed-file' prior to save
+;; Final fix, I hope:
+(advice-add #'recentf-track-opened-file :override
+            (defun my-track-file ()
+              (when (and buffer-file-name
+                         (recentf-keep-p buffer-file-name))
+                (recentf-add-file buffer-file-name)
+                (recentf-save-list))))

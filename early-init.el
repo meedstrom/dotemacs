@@ -15,7 +15,8 @@
 (setq default-frame-alist '((vertical-scroll-bars . nil)
                             (tool-bar-lines . nil)
                             (menu-bar-lines . nil)
-                            (alpha-background . 85)))
+                            ;; (alpha-background . 85)
+                            ))
 
 ;; Temp nil modeline saves ~20ms (@1GHz), but more importantly the init
 ;; process looks nicer

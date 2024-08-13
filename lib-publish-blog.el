@@ -63,13 +63,12 @@ scanned."
   ;; Speed up publishing
   (gcmh-mode 0)
   (setq gc-cons-threshold (* 5 1000 1000 1000))
-  (setq org-mode-hook nil)
   (fset 'org-publish-write-cache-file #'ignore) ;; mega speedup!
   (setq file-name-handler-alist nil)
   (setq coding-system-for-read 'utf-8-unix)
   (setq coding-system-for-write 'utf-8-unix)
-  (setq org-inhibit-startup t) ;; from org-publish-org-to
-  ;; (setq find-file-hook nil)
+  (setq org-inhibit-startup t) ;; from `org-publish-org-to'
+  (setq org-mode-hook nil)
 
   ;; Attempt to speed up publishing, not sure these help much
   (advice-remove 'after-find-file #'doom--shut-up-autosave-a)
@@ -87,6 +86,7 @@ scanned."
                                  dired-hist-mode
                                  editorconfig-mode
                                  electric-indent-mode
+                                 eva-mode
                                  global-diff-hl-mode
                                  global-eldoc-mode
                                  global-emojify-mode
@@ -95,6 +95,12 @@ scanned."
                                  global-prettify-symbols-mode
                                  my-auto-commit-mode
                                  nerd-icons-completion-mode
+                                 org-node-cache-mode
+                                 org-node-backlink-global-mode
+                                 org-node-complete-at-point-mode
+                                 org-node-fakeroam-db-feed-mode
+                                 org-node-fakeroam-nosql-mode
+                                 org-node-fakeroam-redisplay-mode
                                  pixel-scroll-precision-mode
                                  projectile-mode
                                  recentf-mode
@@ -107,6 +113,14 @@ scanned."
                                  window-divider-mode
                                  winner-mode
                                  ws-butler-global-mode))
+  ;; See `org-node--with-quick-file-buffer'
+  (setq find-file-hook nil)
+  (setq kill-buffer-hook nil)
+  (setq org-element-use-cache nil)
+  (setq before-save-hook nil)
+  (setq after-save-hook nil)
+  (setq kill-buffer-query-functions nil)
+  (setq buffer-list-update-hook nil)
 
   (setq lintorg-on-front-matter-hook
         '(lintorg-local-entry/assert-id
@@ -145,7 +159,7 @@ scanned."
     ;; (let ((theme 'doom-zenburn))
     ;; (let ((theme 'doom-rouge))
     (unless (member theme custom-enabled-themes)
-      (load-theme theme)))
+      (me/load-theme theme)))
 
   ;; Copy the files to /tmp to work from there
   (mkdir "/tmp/roam" t)
@@ -162,27 +176,32 @@ scanned."
   (cl-loop for path in (directory-files-recursively "/tmp/roam/org/" "\\.org$")
            do (if (and (not (string-search ".sync-conflict-" path))
                        (not (string-search "/logseq/" path)))
-                  (let* ((uuid (my-org-file-id path))
-                         (newdir (concat "/tmp/roam/org/"
-                                         (my-uuid-to-short uuid)
-                                         "/")))
-                    (mkdir newdir t)
-                    (rename-file path newdir))
+                  (if-let* ((uuid (my-org-file-id path))
+                            (newdir (concat "/tmp/roam/org/"
+                                            (my-uuid-to-short uuid)
+                                            "/")))
+                      (progn
+                        (mkdir newdir t)
+                        (rename-file path newdir))
+                    (warn "No file ID in %s" path)
+                    (delete-file path))
                 (delete-file path)))
-
-  ;; Handle C-u
-  (remove-hook 'my-org-roam-pre-scan-hook #'lintorg-lint)
-  (when (equal current-prefix-arg '(4))
-    (shell-command "rm /tmp/roam/org-roam.db"))
-  (when (equal current-prefix-arg '(16))
-    (shell-command "rm /tmp/roam/org-roam.db")
-    (add-hook 'my-org-roam-pre-scan-hook #'lintorg-lint))
 
   ;; Tell `org-id-locations' and the org-roam DB about the new work directory
   (setq org-roam-directory "/tmp/roam/org/")
   (setq org-roam-db-location "/tmp/roam/org-roam.db")
   (setq org-agenda-files '("/tmp/roam/org/"))
   (setq org-id-locations-file "/tmp/roam/org-id-locations")
+  ;; Handle C-u
+  (remove-hook 'my-org-roam-pre-scan-hook #'lintorg-lint)
+  (when (equal current-prefix-arg '(4))
+    (shell-command "rm /tmp/roam/org-roam.db")
+    (me/wipe-org-id))
+  (when (equal current-prefix-arg '(16))
+    (shell-command "rm /tmp/roam/org-roam.db")
+    (me/wipe-org-id)
+    (add-hook 'my-org-roam-pre-scan-hook #'lintorg-lint))
+
   (unless (file-exists-p org-roam-db-location)
     (org-id-update-id-locations) ;; find files with ROAM_EXCLUDE too
     (org-roam-update-org-id-locations)
@@ -194,12 +213,15 @@ scanned."
   (clrhash my-ids)
 
   ;; Change some things about the Org files, before org-export does its thing.
-  (add-hook 'org-export-before-parsing-functions #'my-add-backlinks 10)
-  (add-hook 'org-export-before-parsing-functions #'my-ensure-section-containers 20)
   (add-hook 'org-export-before-parsing-functions #'my-add-refs-as-paragraphs)
   (add-hook 'org-export-before-parsing-functions #'my-replace-datestamps-with-links)
   (add-hook 'org-export-before-parsing-functions #'my-strip-inline-anki-ids)
-  (add-hook 'org-export-before-parsing-functions #'org-transclusion-mode)
+  (add-hook 'org-export-before-parsing-functions #'org-transclusion-mode 1)
+  (add-hook 'org-export-before-parsing-functions
+            ;; other hooks try to manipulate the transcluded areas
+            (lambda (&rest _) (setq buffer-read-only nil)) 2)
+  (add-hook 'org-export-before-parsing-functions #'my-add-backlinks 10)
+  (add-hook 'org-export-before-parsing-functions #'my-ensure-section-containers 20)
 
   (org-publish "my-slipbox-blog" t)
   (my-check-id-collisions)
@@ -226,6 +248,7 @@ scanned."
            ;; tag in `my-publish-to-blog'.  Maybe upstream a patch?
            :exclude-tags ,my-tags-to-avoid-uploading)))
 
+(defvar my-publish-ctr 0)
 (defun my-publish-to-blog (plist filename pub-dir)
   "Take org file FILENAME and make html file in PUB-DIR.
 Then postprocess that same html into json and atom files.
@@ -243,21 +266,24 @@ through to `org-html-publish-to-html'."
       (cl-assert (not (buffer-modified-p open)))
       (cl-assert (memq (buffer-local-value 'buffer-undo-list open) '(t nil)))
       (kill-buffer open))
+    (when (= 0 (% (cl-incf my-publish-ctr) 200))
+      ;; Reap open file handles (max 1024 on many distros, also in Emacs)
+      (garbage-collect))
     (with-current-buffer (find-file-noselect filename)
       (goto-char (point-min))
       (let* ((html-path (org-html-publish-to-html plist filename pub-dir))
              (keywords (org-collect-keywords '("DATE" "SUBTITLE")))
              (tags (org-get-tags))
-             (created (substring (org-entry-get nil "CREATED") 1 -1))
+             (created (substring (org-entry-get nil "CREATED") 1 11))
              (updated (let ((value (map-elt keywords "DATE")))
                         (when (and value (not (string-blank-p (car value))))
-                          (substring (car value) 1 -1))))
+                          (substring (car value) 1 11))))
              (created-fancy
-              (format-time-string (car org-timestamp-custom-formats)
+              (format-time-string (car org-time-stamp-custom-formats)
                                   (date-to-time created)))
              (updated-fancy
               (when updated
-                (format-time-string (car org-timestamp-custom-formats)
+                (format-time-string (car org-time-stamp-custom-formats)
                                     (date-to-time updated))))
              (pageid (-last-item (split-string pub-dir "/" t)))
              (hidden (not (null (-intersection my-tags-for-hiding tags))))
@@ -297,38 +323,39 @@ through to `org-html-publish-to-html'."
                            (list :content (my-customize-the-html
                                            html-path metadata))))
              (uuid (org-id-get)))
-        ;; Write JSON object
-        (with-temp-file (concat "/tmp/roam/json/" pageid)
-          (insert (json-encode post)))
-        ;; Write Atom entry if it's an okay post for the feed
-        (when (and (not hidden)
-                   (not (-intersection tags '("tag" "daily" "stub" "unwashed")))
-                   (string-lessp "2023" (or updated created)))
-          (with-temp-file (concat "/tmp/roam/atom/" pageid)
-            (insert (my-make-atom-entry post uuid)))))
+        (let ((save-silently t))
+          ;; Write JSON object
+          (with-temp-file (concat "/tmp/roam/json/" pageid)
+            (insert (json-encode post)))
+          ;; Write Atom entry if it's an okay post for the feed
+          (when (and (not hidden)
+                     (not (-intersection tags '("tag" "daily" "stub" "unwashed")))
+                     (string-lessp "2023" (or updated created)))
+            (with-temp-file (concat "/tmp/roam/atom/" pageid)
+              (insert (my-make-atom-entry post uuid))))))
       (kill-buffer (current-buffer)))))
 
 (defun my-customize-the-html (html-path metadata)
   "Take contents of HTML-PATH and return customized content."
-  (if (f-empty-p html-path)
-      ""
-    (let ((dom (with-temp-buffer
-                 (insert-file-contents html-path)
-                 ;; Give the ToC div a class and remove its pointless inner div
-                 (when (re-search-forward "^<div id===\"table-of-contents\".*?>" nil t)
-                   (replace-match "<nav class=\"toc\" role=\"doc-toc\">")
-                   (re-search-forward "^<div id=\"text-table-of-contents\".*?>")
-                   (replace-match "")
-                   (search-forward "</div>\n</div>")
-                   (replace-match "</nav>"))
-                 ;; Add role="doc-endnotes"
-                 (goto-char (point-min))
-                 (when (re-search-forward "^<h2 id.*>What links here" nil t)
-                   (forward-line -1)
-                   (search-forward " class=\"outline-2\"" (line-end-position))
-                   (insert " role=\"doc-endnotes\""))
+  (let ((dom (with-temp-buffer
+               (insert-file-contents html-path)
+               ;; Give the ToC div a class and remove its pointless inner div
+               (when (re-search-forward "^<div id===\"table-of-contents\".*?>" nil t)
+                 (replace-match "<nav class=\"toc\" role=\"doc-toc\">")
+                 (re-search-forward "^<div id=\"text-table-of-contents\".*?>")
+                 (replace-match "")
+                 (search-forward "</div>\n</div>")
+                 (replace-match "</nav>"))
+               ;; Add role="doc-endnotes"
+               (goto-char (point-min))
+               (when (re-search-forward "^<h2 id.*>What links here" nil t)
+                 (forward-line -1)
+                 (search-forward " class=\"outline-2\"" (line-end-position))
+                 (insert " role=\"doc-endnotes\""))
 
-                 (libxml-parse-html-region))))
+               (libxml-parse-html-region))))
+    (if (null dom)
+        ""
 
       ;; Declutter unused classes
       (cl-loop for node in (--mapcat (dom-by-class dom it) '("org-ul" "org-ol"))
@@ -357,6 +384,15 @@ through to `org-html-publish-to-html'."
                                         `[:select [tag]
                                                   :from tags
                                                   :where (= node-id ,uuid?)]))))
+            ;; 2024-07-25 I'm no longer adding :noexport: everywhere.  My
+            ;; system was made for opt-out publishing, so hack it to be opt-in
+            ;; via explicitly including "pub".
+            (when (or (not (-intersection target-tags
+                                          (append my-tags-for-publishing
+                                                  my-tags-to-avoid-uploading)))
+                      (null target-tags))
+              (push "noexport" target-tags))
+
             ;; Replace all UUID with my shortened form, and strip the
             ;; #HEADING-ID if it matches /PAGE-ID.
             (dom-set-attribute anchor 'href (my-strip-hash-if-matches-base

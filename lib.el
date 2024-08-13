@@ -23,6 +23,15 @@
   (require 'dash)
   (require 'crux))
 
+(defun me/wipe-org-id ()
+  (interactive)
+  (delete-file org-id-locations-file)
+  (setq org-id-locations nil)
+  (setq org-id--locations-checksum nil)
+  (setq org-agenda-text-search-extra-files nil)
+  (setq org-id-files nil)
+  (setq org-id-extra-files nil))
+
 (defun me/maybe-revert-buffer ()
   (require 'autorevert)
   (unless (or auto-revert-mode (active-minibuffer-window))
@@ -2605,7 +2614,7 @@ to me to do that."
                 (delete-region beg end)
                 (goto-char beg)
                 (let ((fancy (format-time-string
-                              (car org-timestamp-custom-formats)
+                              (car org-time-stamp-custom-formats)
                               (date-to-time datestamp))))
                   (insert (concat "[[id:" (caar daily-id) "][<" fancy ">]]")))))))))))
 
