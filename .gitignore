@@ -1,6 +1,8 @@
 /elpaca/
 /eln-cache/
-/private.el
+/etc/
+/var/
 
+private.el
 *.elc
 .eshell-*
