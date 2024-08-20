@@ -17,16 +17,18 @@
 
 ;;; Commentary:
 
-;; Used to try implementing a multiline prompt -- it's pretty unreliable.  The
-;; way shell-mode does it, it has a `shell-prompt-pattern', but won't use it by
-;; default for anything other than C-c C-p motion.  Instead, it relies on
-;; comint using the "field" text property to mark a prompt.  Docstring of
-;; `shell-prompt-pattern' says: "The pattern should probably not match more
-;; than one line.  If it does, Shell mode may become confused trying to
-;; distinguish prompt from input on lines which don't start with a prompt."
-;; Eshell works in a similar way AFAIK.
-;;
-;; Anyhoo... A single-line prompt can be plenty informative.
+;; This file enables three powerful conveniences.
+
+;; TIMING: Slow commands will automatically write the time elapsed into the
+;; prompt when done.
+
+;; BACKREFS: Every output is saved into a variable with a name like "b2" which
+;; can then be accessed anywhere in Emacs, or in an eshell command as $b2.
+
+;; TIMESTAMPS: A common rookie move is to timestamp the time the prompt opened,
+;; not the time a command actually began to run, which could well be a few days
+;; after the prompt opened.  This will timestamp the prompt at the correct
+;; time.
 
 ;;; Config:
 
@@ -50,9 +52,6 @@
 (defvar-local my-esh-last-cmd-start nil)
 (defvar-local my-esh-backref-counter 1)
 (defvar-local my-esh-id nil)
-;; (make-variable-buffer-local 'my-esh-last-cmd-start)
-;; (make-variable-buffer-local 'my-esh-backref-counter)
-;; (make-variable-buffer-local 'my-esh-id)
 
 (defvar my-real-eshell-post-command-hook nil
   "Hook run after a non-blank command.
@@ -87,8 +86,8 @@ Functions here have access to the variable
       (insert (format-time-string "ran at %H:%M"))
       (my-esh-re-propertize-prompt-at-point))))
 
-;; TODO Save lisp return values as actual lisp, not a string.  See
-;; unintended result at $c18:
+;; TODO: Save lisp return values as actual lisp, not a string.  See
+;; unintxended result at $c18:
 ;;
 ;; 〈 ran at 14:49／／result $c17 〉 echo {pwd} (+ 2 3) {cat /tmp/.X1-lock}
 ;; ("/home/me/.doom.d" 5 1594)
@@ -128,10 +127,10 @@ Functions here have access to the variable
   "Run `my-real-eshell-post-command-hook'.
 Designed for `post-command-hook'."
   (run-hooks 'my-real-eshell-post-command-hook)
-  ;; Possible bug(?) runs post-command-hook after no-ops, but pre-command-hook
-  ;; didn't beforehand.  By setting this variable at pre-command-hook, and
-  ;; nulling it after post-command-hook, we can inspect the variable to know
-  ;; if a real command did run.
+  ;; Explanation: For some reason, post-command-hook runs after no-ops, but
+  ;; pre-command-hook didn't beforehand!  So by setting this variable at
+  ;; pre-command-hook, and nulling it after post-command-hook, we can inspect
+  ;; the variable to know if a real command did run.
   (setq my-esh-last-cmd-start nil))
 
 (defun my-esh-print-elapsed-maybe ()

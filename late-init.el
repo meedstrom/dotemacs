@@ -12,6 +12,7 @@
 (elpaca package-lint)
 (elpaca persist)
 (elpaca ts)
+;; (elpaca sisyphus)
 
 ;; Untried
 (elpaca (casual-avy :repo "https://github.com/kickingvegas/casual-avy"))
@@ -52,7 +53,7 @@
 ;; (elpaca (emacs-piper :repo "https://gitlab,com/howardabrams/emacs-piper"))
 ;; (elpaca (firefox-bookmarks :repo "https://github.com/tangxinfa/firefox-bookmarks"))
 ;; (elpaca (math-delimiters :repo "https://github.com/oantolin/math-delimiters"))
-;; (elpaca (org-super-links :repo "https://github.com/toshism/org-super-links"))
+(elpaca (org-super-links :repo "https://github.com/toshism/org-super-links"))
 ;; (elpaca bm)
 ;; (elpaca bui)
 ;; (elpaca buttercup)
@@ -169,6 +170,7 @@
 
 (use-package consult
   :config
+  ;; (setq consult-org-roam-buffer-after-buffers t)
   ;; hella weak computer
   (setq consult-fontify-max-size 100000)
   (setq consult-preview-partial-chunk 10000)
@@ -837,30 +839,24 @@
   ;; (setq org-journal-time-format "")
   )
 
-;; (use-package org-node-fakeroam
-;;   :ensure (:repo "/home/kept/emacs/org-node" :branch "dev"
-;;            :files (:defaults
-;;                    "org-node-fakeroam.el"
-;;                    (:exclude "org-node.el"
-;;                              "org-node-parser.el"
-;;                              "org-node-obsolete.el"
-;;                              "org-node-backlink.el"))))
-
 (use-package org-node-fakeroam
+  :ensure (:repo "meedstrom/org-node"
+                 :fetcher github
+                 :files ("org-node-fakeroam.el"))
   :after org-node
-  :requires org-node
-  :ensure (:repo "/home/kept/emacs/org-node" :branch "dev"
-                 :files ("org-node-fakeroam.el")))
+  :requires org-node)
 
 (use-package org-node
-  :ensure (:repo "/home/kept/emacs/org-node" :branch "dev"
+  :ensure (:repo "meedstrom/org-node"
+                 :fetcher github
                  :files (:defaults (:exclude "org-node-fakeroam.el")))
   :after org
   :config
+  ;; (add-hook 'org-mode-hook #'org-node-backlink-mode)
   (setq org-roam-directory "/home/kept/roam/")
   (setq org-node-extra-id-dirs '("/home/kept/roam/" "/home/me/.doom.d/"))
-  (add-hook 'after-save-hook 'org-node-rename-file-by-title)
   (setq org-node-renames-allowed-dirs '("/home/kept/roam/"))
+  (add-hook 'after-save-hook 'org-node-rename-file-by-title)
   ;; (setq org-node--debug nil)
   ;; (setopt org-node-perf-eagerly-update-link-tables t)
   ;; (setopt org-node-perf-assume-coding-system 'utf-8-auto-unix)
@@ -869,9 +865,9 @@
   ;; (setopt org-node-slug-fn #'org-node-slugify-like-roam-default)
   ;; (setopt org-node-datestamp-format "%Y%m%dT%H%M%S--")
   ;; (setopt org-node-slug-fn #'org-node-slugify-for-web)
-  (setq org-node-creation-fn #'org-capture)
+  ;; (setq org-node-creation-fn #'org-capture)
   ;; (setopt org-node-creation-fn #'org-node-new-via-roam-capture)
-  ;; (setopt org-node-creation-fn #'org-node-new-file)
+  (setopt org-node-creation-fn #'org-node-new-file)
   ;; (setopt org-node-alter-candidates t)
   (setq org-node-filter-fn
         (lambda (node)
@@ -880,14 +876,16 @@
                (string-search "noagenda/" (org-node-get-file-path node))))))
 
   (add-hook 'org-roam-mode-hook #'visual-line-mode)
-  (add-hook 'org-roam-mode-hook #'org-indent-mode)
+
+  ;; TODO Do a hard-rewrap and cache that output? This is hella slow.
+  ;; (add-hook 'org-roam-mode-hook #'org-indent-mode)
 
   (org-node-cache-mode)
-  (org-node-complete-at-point-mode)
   (org-node-backlink-global-mode)
-  (org-node-fakeroam-nosql-mode)
-  (org-node-fakeroam-db-feed-mode)
+  (org-node-fakeroam-jit-backlinks-mode)
   (org-node-fakeroam-redisplay-mode)
+  ;; (org-node-complete-at-point-mode)
+  ;; (org-node-fakeroam-db-feed-mode)
 
   ;; Make sure the extracted subtree inherits any CREATED property,
   ;; else creates one for today
@@ -910,19 +908,20 @@
   :defer
   :init
   (add-hook 'org-roam-capture-new-node-hook #'org-node-put-created)
-  (setopt org-roam-file-exclude-regexp '("logseq/bak/" "logseq/version-files/"))
-  (setopt org-roam-link-auto-replace nil)
-  (setopt org-roam-db-update-on-save nil)
-  (setopt org-roam-directory "/home/kept/roam/")
-  (setopt org-roam-dailies-directory "daily/")
-  (setopt org-roam-ui-browser-function #'my-browse-url-chromium-kiosk)
-  (setopt org-roam-dailies-capture-templates
-          `(("d" "default" entry "* %<%H:%M>\n%?" :if-new
-             (file+head "%<%Y-%m-%d>.org"
-                        ,(lines "#+title: %<%Y-%b-%d>"
-                                "#+filetags: :noexport:daily:"))
-             :immediate-finish t
-             :jump-to-captured t)))
+  (setq org-roam-file-exclude-regexp '("logseq/bak/" "logseq/version-files/"))
+  (setq org-roam-link-auto-replace nil)
+  (setq org-roam-db-update-on-save nil)
+  (setq org-roam-directory "/home/kept/roam/")
+  (setq org-roam-dailies-directory "daily/")
+  (setq org-roam-ui-browser-function #'my-browse-url-chromium-kiosk)
+  (setq org-roam-dailies-capture-templates
+        `(("d" "default" entry "* %<%H:%M>\n%?" :if-new
+           (file+head "%<%Y-%m-%d>.org"
+                      ,(string-join '("#+title: %<%Y-%b-%d>"
+                                      "#+filetags: :daily:")
+                                    "\n"))
+           :immediate-finish t
+           :jump-to-captured t)))
 
   :config
   (add-hook 'me/load-theme-hook
@@ -1258,6 +1257,7 @@
 (setq garbage-collection-messages nil)
 (setq auto-save-no-message t)
 (setq suggest-key-bindings nil) ;; prefer to show command's return value
+(setq save-silently t)
 
 ;; Browse with Firefox or EWW depending on the link
 (setq browse-url-generic-program "firefox")
@@ -1434,7 +1434,16 @@
 (keymap-set global-map "<f2> m" #'my-last-daily-file)
 (keymap-set global-map "<f2> n" #'org-roam-dailies-capture-today)
 (keymap-set global-map "<f2> z" #'my-sleep)
-(keymap-set global-map "<f3> f d" #'crux-delete-file-and-buffer)
+(keymap-set global-map "<f3> f d" #'me/delete-this-file)
+
+(defun me/delete-this-file ()
+  (interactive)
+  (let ((filename (buffer-file-name)))
+    (when (y-or-n-p (format "Are you sure you want to delete %s? " filename))
+      (delete-file filename delete-by-moving-to-trash)
+      (message "Deleted file %s" filename)
+      (kill-buffer))))
+
 (keymap-set global-map "<f3> q q" #'save-buffers-kill-emacs)
 (keymap-set global-map "<f5>" #'repeat)
 (keymap-set global-map "C-0" #'hippie-expand)
@@ -1532,7 +1541,7 @@
 (keymap-set global-map "M-o l" #'helm-locate)
 (keymap-set global-map "M-o p" #'my-spawn-process)
 (keymap-set global-map "M-o r" #'vertico-repeat)
-(keymap-set global-map "M-o s" #'helm-selector-shell)
+(keymap-set global-map "M-o s" #'org-node-series-dispatch)
 (keymap-set global-map "M-o w" #'sp-rewrap-sexp)
 (keymap-set global-map "M-o x" #'execute-extended-command)
 (keymap-set global-map "M-o y" (defrepeater #'my-fill-unfill-respect-double-space))
@@ -1834,20 +1843,22 @@
          :prepend t
          )
 
+        ("s" "Capture into ID-node series"
+         plain (function org-node-series-capture-target) nil
+         :empty-lines-after 1
+         :no-save t)
+
         ("n" "Capture into ID node"
          plain (function org-node-capture-target) nil
-         :empty-lines-after 1)
+         :empty-lines-after 1
+         :no-save t)
 
-        ("d" "Daily"
-         plain (function org-node--daily-capture-target) nil
-         :empty-lines-after 1)
-
-        ("v" "Visit ID node"
+        ("j" "Jump to ID node"
          plain (function org-node-capture-target) nil
          :jump-to-captured t
          :immediate-finish t)
 
-        ("s" "Stub ID node"
+        ("q" "Make quick stub ID node"
          plain (function org-node-capture-target) nil
          :immediate-finish t)))
 
@@ -1896,10 +1907,10 @@
 (setq auto-save-timeout 5)
 (setq auto-save-no-message t)
 (setq my-save-all-timer (run-with-idle-timer 40 t #'my-save-all))
-(add-function :after after-focus-change-function #'my-save-all)
+;; (add-function :after after-focus-change-function #'my-save-all)
 ;; (add-hook 'window-buffer-change-functions #'my-save-all)
-(add-hook 'magit-pre-display-buffer-hook #'my-save-all)
-(add-hook 'magit-pre-refresh-hook #'my-save-all)
+;; (add-hook 'magit-pre-display-buffer-hook #'my-save-all)
+;; (add-hook 'magit-pre-refresh-hook #'my-save-all)
 
 (advice-add 'after-find-file :before #'my-auto-recover-this-file)
 (let (mutually-recursed-once)
@@ -1969,4 +1980,6 @@
               (when (and buffer-file-name
                          (recentf-keep-p buffer-file-name))
                 (recentf-add-file buffer-file-name)
-                (recentf-save-list))))
+                (let ((save-silently t)
+                      (inhibit-message t))
+                  (recentf-save-list)))))

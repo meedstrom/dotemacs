@@ -1271,7 +1271,7 @@ temporarily overridden."
       (if interactive
           (byte-compile-file (buffer-file-name))
         ;; When used as a hook, only warn about real errors
-        (cl-letf ((symbol-value 'byte-compile-warnings) nil)
+        (cl-letf (((symbol-value 'byte-compile-warnings) nil))
           (byte-compile-file (buffer-file-name)))))))
 
 (defvar my-buffer-ring nil)

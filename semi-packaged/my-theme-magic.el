@@ -81,26 +81,36 @@
     doom-solarized-dark-high-contrast
     doom-rouge))
 
+;; Bonus.  Switch themes WITHOUT closing minibuffer (like Helm)!
+;; Here's how.  Let's assume C-; is bound to embark-act.  Eval this.
+;; Then type M-x me/load-theme.  Then when selecting a theme, DON'T press RET!
+;; Type C-; C-m instead.
+(setq embark-quit-after-action
+      '((me/load-theme . nil)
+        (t . t)))
+
+;;; Hooks
+
 (defun me/prism-desaturate-maybe ()
-  "Modify `prism-desaturations'.
-Don't forget to run `prism-set-colors'."
-  ;; (require 'prism)
+  "Modify `prism-desaturations' to suit current theme."
   (when (and (length= custom-enabled-themes 1)
-             (boundp 'prism-mode)
-             prism-mode)
+             (boundp 'prism-mode))
     (let ((theme (car custom-enabled-themes)))
       (if (member theme me/themes-to-desaturate)
           ;; Tone down fruit-salad themes
           (setq prism-desaturations '(40 50 60))
+        ;; Preserve colors of already-toned-down themes
         (if (or (member theme me/themes-to-saturate)
-                ;; Most ef-themes are not fruit-salads
                 (string-prefix-p "ef-" (symbol-name theme)))
-            (setq prism-desaturations '(0 20 60)))))))
+            (setq prism-desaturations '(0 20 60))))))
+  ;; If Prism is loaded, apply the new settings
+  (when (fboundp #'prism-set-colors)
+    (prism-set-colors)))
 
 (defun me/italicize-comments ()
   (set-face-italic 'font-lock-comment-face t))
 
-;;; Core lib:
+;;; Core
 
 (defun me/toggle-scheduled-theming (&optional called-interactively)
   "Turn scheduled theming on and off.
@@ -141,10 +151,7 @@ selections are taken from `me/okay-themes-day' in the day and
   (run-hooks 'me/load-theme-hook))
 
 
+
 ;; Bonus snippet!  When interactively selecting a theme with `me/load-theme',
 ;; then (assuming C-l is `embark-act') typing C-; C-m will load the theme at
 ;; point without exiting the minibuffer, so you can just go try another theme.
-
-;; (setq embark-quit-after-action
-;;       '((me/load-theme . nil)
-;;         (t . t)))

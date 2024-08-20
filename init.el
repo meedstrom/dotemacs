@@ -61,27 +61,35 @@
 (use-package dash) 
 (elpaca-wait)
 
-;; Execute 99% of my initfiles
-(let ((e user-emacs-directory))
-  (load (concat e "lib.el"))
-  (dolist (file (directory-files (concat e "semi-packaged/")
-                                 t "^\\w.*el$"))
-    (load file))
-  (load (concat e "private.el"))
-  (load (concat e "late-init.el")) ;; The main of the main
-  (load (setq custom-file (concat e "custom.el"))))
+;; Execute all my initfiles
+(let ((default-directory user-emacs-directory))
+  (load-file "lib.el")
+  (mapc #'load-file (directory-files "semi-packaged/" t "^\\w.*el$"))
+  (load-file "private.el")
+  (load-file "late-init.el")
+  (load-file (setq custom-file (concat user-emacs-directory "custom.el")))
+
+  ;; (load (concat dir "lib.el"))
+  ;; (dolist (file (directory-files (concat dir "semi-packaged/")
+  ;;                                t "^\\w.*el$"))
+  ;;   (load file))
+  ;; (load (concat dir "private.el"))
+  ;; (load (concat dir "late-init.el"))
+  ;; ;; Custom can come last, because Elpaca defers package loads
+  ;; (load (setq custom-file (concat dir "custom.el")))
+  )
 
 
 ;;; Progressively preload packages in the background
 
-(add-hook 'elpaca-after-init-hook #'me/progressive-preload 99)
-
-(defun me/progressive-preload ()
-  (while-no-input
-    (while-let ((next-lib (pop me/progressive-preload-queue)))
-      (require next-lib nil t)))
-  (if me/progressive-preload-queue
-      (run-with-idle-timer 2 nil #'me/progressive-preload)))
+(add-hook 'elpaca-after-init-hook
+          (defun me/progressive-preload ()
+            (while-no-input
+              (while-let ((next-lib (pop me/progressive-preload-queue)))
+                (require next-lib nil t)))
+            (if me/progressive-preload-queue
+                (run-with-idle-timer 2 nil #'me/progressive-preload)))
+          99)
 
 (defvar me/progressive-preload-queue
   '(dired
