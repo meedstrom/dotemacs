@@ -1,7 +1,7 @@
 /elpaca/
-/eln-cache/
 /etc/
 /var/
+/mothball/
 
 private.el
 *.elc

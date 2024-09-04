@@ -23,9 +23,88 @@
   (require 'dash)
   (require 'crux))
 
+(defun me/persist-state--maybe-sync-org-id-locations ()
+  "Combine `org-id-locations-load' and `org-id-locations-save'.
+This permits usage from multiple running instances of Emacs."
+  (when (and (featurep 'org-id)
+             org-id-track-globally)
+    (if (and (file-readable-p org-id-locations-file)
+             (> (float-time (time-since
+                             (file-attribute-modification-time
+                              (file-attributes org-id-locations-file))))
+                ;; +5 is safety margin
+                (+ 5 persist-state-save-interval)))
+        (when (file-writable-p org-id-locations-file)
+          (org-id-locations-save))
+      ;; The database file has been recently modified, presumably by another
+      ;; instance of Emacs.  Here we could just run `org-id-locations-load',
+      ;; but let's add any IDs that are only known by this instance, even if
+      ;; they represent deleted locations, because it is far cheaper to have
+      ;; stale IDs in the database (they'll just be cleaned later) than to ask
+      ;; org-id for an ID it does not know.
+      (with-temp-buffer
+        (insert-file-contents org-id-locations-file)
+        (let ((default-directory (file-name-directory org-id-locations-file))
+              (new-locs
+               (cl-loop for loc in-ref (read (current-buffer))
+                        ;; See `org-id-locations-load'
+                        unless (file-name-absolute-p (car loc))
+                        do (setf (car loc) (expand-file-name (car loc)))
+                        collect loc))
+              (curr-locs (if (hash-table-p org-id-locations)
+                             (org-id-hash-to-alist org-id-locations)
+                           org-id-locations)))
+          (setq org-id-locations
+                (org-id-alist-to-hash
+                 (cl-nunion new-locs curr-locs
+                            :test #'string= :key #'car)))))
+      (when (file-writable-p org-id-locations-file)
+        (org-id-locations-save)))))
+
+(defun me/persist-state--maybe-sync-org-id-locations* ()
+  "Combine `org-id-locations-load' and `org-id-locations-save'.
+This permits usage from multiple running instances of Emacs."
+  (when (and (featurep 'org-id)
+             org-id-track-globally)
+    (if (and (file-readable-p org-id-locations-file)
+             (> (float-time (time-since
+                             (file-attribute-modification-time
+                              (file-attributes org-id-locations-file))))
+                (+ 5 persist-state-save-interval)))
+        (when (file-writable-p org-id-locations-file)
+          (org-id-locations-save))
+      (org-id-locations-load))))
+
+(defun me/del-anon-fns-from-hook (hook)
+  "Remove all lambdas and closures from HOOK."
+  (interactive "SHook: ")
+  (dolist (fn (default-value hook))
+    (when (or (eq 'lambda (car-safe fn))
+              (eq 'closure (car-safe fn)))
+      (remove-hook hook fn)
+      (message "Removed hook: %s" fn)))
+  (dolist (fn (symbol-value hook))
+    (when (or (eq 'lambda (car-safe fn))
+              (eq 'closure (car-safe fn)))
+      (remove-hook hook fn t)
+      (message "Removed buffer-local hook: %s" fn))))
+
+(defun mstrom/sp-kill-hybrid-sexp (arg)
+  "Use `sp-kill-hybrid-sexp' unless the line is long.
+It hangs on long lines, so fall back on `kill-line'."
+  (interactive "P")
+  (if (> (- (pos-eol) (point)) 200)
+      (kill-line arg)
+    (sp-kill-hybrid-sexp arg)))
+
 (defun me/wipe-org-id ()
+  "Completely wipe org-id-locations."
   (interactive)
-  (delete-file org-id-locations-file)
+  (require 'eww)
+  (rename-file org-id-locations-file
+               (eww-make-unique-file-name
+                (file-name-nondirectory org-id-locations-file)
+                (file-name-directory org-id-locations-file)))
   (setq org-id-locations nil)
   (setq org-id--locations-checksum nil)
   (setq org-agenda-text-search-extra-files nil)
@@ -379,6 +458,7 @@ Stop once the buffer is no longer visible."
 (defun my-remove-all-advice (symbol)
   "Remove all the advices added to SYMBOL.
 Useful when some of them are anonymous functions."
+  (interactive "SSymbol: ")
   (advice-mapc (lambda (f _) (advice-remove symbol f)) symbol))
 
 (defun my-uuid-to-pageid-old-v2 (uuid)
@@ -2814,28 +2894,26 @@ unaltered with no complaints."
       STRING
     (substring STRING 0 CUTOFF)))
 
-;; Lifted from Doom
+;; Modified from Doom
 (unless (boundp 'doom-version)
   (defmacro quiet! (&rest forms)
-    "Run FORMS without generating any output.
-
-This silences calls to `message', `load', `write-region' and anything that
-writes to `standard-output'. In interactive sessions this inhibits output to the
-echo-area, but not to *Messages*."
     `(if init-file-debug
          (progn ,@forms)
-       ,(if noninteractive
-            `(letf! ((standard-output (lambda (&rest _)))
-                     (defun message (&rest _))
-                     (defun load (file &optional noerror nomessage nosuffix must-suffix)
-                       (funcall load file noerror t nosuffix must-suffix))
-                     (defun write-region (start end filename &optional append visit lockname mustbenew)
+       (let ((inhibit-message t)
+             (save-silently t)
+             (standard-output (lambda (&rest _)))
+             (real-write-region (symbol-function #'write-region))
+             (real-load (symbol-function #'load)))
+         (cl-letf* (((symbol-function #'message)
+                     (lambda (&rest _)))
+                    ((symbol-function #'load)
+                     (lambda (file &optional noerror nomessage nosuffix must-suffix)
+                       (funcall real-load file noerror t nosuffix must-suffix)))
+                    ((symbol-function #'write-region)
+                     (lambda (start end filename &optional append visit lockname mustbenew)
                        (unless visit (setq visit 'no-message))
-                       (funcall write-region start end filename append visit lockname mustbenew)))
-                    ,@forms)
-          `(let ((inhibit-message t)
-                 (save-silently t))
-             (prog1 ,@forms (message "")))))))
+                       (funcall real-write-region start end filename append visit lockname mustbenew))))
+           ,@forms)))))
 
 (unless (boundp 'doom-version)
   (defmacro after! (package &rest body)

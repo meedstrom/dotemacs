@@ -1,5 +1,4 @@
 ;; -*- lexical-binding: t; -*-
-;; TODO: Crib doom/escape to avoid "Not in most nested command loop"
 
 ;;; Init Elpaca, a package manager (using snippet from their README)
 (defvar elpaca-installer-version 0.7)
@@ -40,6 +39,30 @@
 (add-hook 'after-init-hook #'elpaca-process-queues)
 (elpaca `(,@elpaca-order))
 
+;; Reduce to minimum set of ignores, to upgrade all upgradables on demand
+(setq elpaca-ignored-dependencies
+      (append
+       '(cl-lib cl-generic nadvice) ;; downgrades in disguise
+       (cl-loop
+        for dep in elpaca-ignored-dependencies
+        when (let ((repo (plist-get (elpaca-recipe dep) :repo)))
+               (or (not repo)
+                   (equal repo "https://github.com/emacs-mirror/emacs")))
+        collect dep)))
+
+;; Some builtins must be upgraded specially for now (map, seq, tramp,...)
+;; https://github.com/progfolio/elpaca/issues/216
+(elpaca `(seq :build
+              ,(append (butlast (if (file-exists-p
+                                     (file-name-concat elpaca-builds-directory
+                                                       "seq"))
+                                    elpaca--pre-built-steps
+                                  elpaca-build-steps))
+                       (list (lambda (e)
+                               (when (featurep 'seq) (unload-feature 'seq t))
+                               (elpaca--continue-build e))
+                             'elpaca--activate-package))))
+
 ;; Setup use-package
 (elpaca elpaca-use-package
   (setopt use-package-always-ensure t)
@@ -50,7 +73,7 @@
   ;; Make the :ensure keyword call Elpaca
   (elpaca-use-package-mode))
 
-;; Require packages needed during init
+;; Require packages I need during init
 (use-package no-littering)
 (elpaca-wait)
 (use-package defrepeater)
@@ -65,7 +88,7 @@
   (load-file (setq custom-file "custom.el")))
 
 
-;;;; Packages
+;;;; Unconfigured packages
 
 ;; Pkg dev
 (elpaca (unpackaged :repo "https://github.com/alphapapa/unpackaged.el"))
@@ -82,12 +105,12 @@
 ;; Untried
 (elpaca (casual-avy :repo "https://github.com/kickingvegas/casual-avy"))
 (elpaca (casual-dired :repo "https://github.com/kickingvegas/casual-dired"))
-(elpaca (combobulate :repo "https://github.com/mickeynp/combobulate"))
 (elpaca dogears)
-(elpaca tree-sitter)
-(elpaca tree-sitter-langs)
+;; (elpaca tree-sitter)
+;; (elpaca tree-sitter-langs)
 (elpaca ranger)
-(elpaca (org-roam-daily-reflection :repo "https://github.com/emacsomancer/org-roam-daily-reflection"))
+;; (elpaca (org-roam-daily-reflection
+;; :fetcher github :repo "emacsomancer/org-roam-daily-reflection"))
 
 ;; The rest
 (elpaca (ess-rproj :repo "https://github.com/chainsawriot/ess-rproj"))
@@ -167,6 +190,11 @@
 ;; (elpaca vimgolf)
 ;; (elpaca visual-regexp)
 
+;; TODO: Crib doom/escape to avoid "Not in most nested command loop"
+
+
+;;;; Use-package forms
+
 (use-package apheleia
   :config
   ;; (setopt apheleia-log-debug-info t)
@@ -185,7 +213,6 @@
 (use-package autorevert
   :ensure nil
   :init
-
   (add-hook 'focus-in-hook #'me/maybe-revert-visible-buffers)
   (add-hook 'after-save-hook #'me/maybe-revert-visible-buffers)
   (add-hook 'doom-switch-buffer-hook #'me/maybe-revert-buffer)
@@ -207,15 +234,14 @@
   (setopt calibredb-db-dir (expand-file-name "metadata.db" calibredb-root-dir))
   (setopt calibredb-format-width 8))
 
-(use-package copilot
-  :disabled
+(use-package copilot :disabled
   :defer
   :hook (prog-mode . copilot-mode)
   :bind (:map copilot-completion-map
               ("<tab>" . 'copilot-accept-completion)
               ("C-<tab>" . 'copilot-accept-completion-by-word)))
 
-(use-package cape
+(use-package cape :disabled
   :after corfu
   :config
   ;; https://github.com/minad/corfu/wiki#configuring-corfu-for-eglot
@@ -227,6 +253,8 @@
                        #'cape-file))))
   (add-hook 'eglot-managed-mode-hook #'my/eglot-capf))
 
+(use-package combobulate
+  :ensure (:fetcher github :repo "mickeynp/combobulate"))
 
 (use-package consult-dir
   :defer
@@ -351,38 +379,75 @@
 (use-package dired-hacks :disabled
   :init (add-hook 'dired-mode-hook #'dired-collapse-mode))
 
-;; NOTE: Try without for a while
-;; https://old.reddit.com/r/emacs/comments/1dcqdph/emacs_30_is_super_fast/l83uhas/
-(use-package eager-state
-  :ensure (:repo "https://github.com/meedstrom/eager-state")
+(use-package persist-state
   :config
-  ;; (eager-state-preempt-kill-emacs-hook-mode)
-  ;; (advice-add #'kill-emacs :before (lambda (&rest _) (setq kill-emacs-hook nil)))
-  )
+  (defun persist-state--regularly-run-on-idle (f &rest _)
+    (run-with-timer persist-state-save-interval
+                    persist-state-save-interval
+                    f))
+  (defun persist-state--save-state ()
+    (run-with-idle-timer
+     persist-state-wait-idle nil
+     #'persist-state--consume (copy-sequence persist-state-saving-functions)))
+  ;; Be quiet and pseudo-async
+  (defun persist-state--consume (fns)
+    ;; Be truly quiet
+    (let ((inhibit-message t)
+          (save-silently t)
+          (standard-output (lambda (&rest _)))
+          (real-write-region (symbol-function #'write-region)))
+      (cl-letf (((symbol-function #'write-region)
+                 (lambda (start end filename &optional append visit lockname mustbenew)
+                   (unless visit (setq visit 'no-message))
+                   (funcall real-write-region start end filename append visit lockname mustbenew))))
+        ;; Break immediately on user activity (potentially dangerous)
+        (while-no-input
+          (while fns (funcall (pop fns))))))
+    ;; Continue consuming list soon if more to do
+    (when fns (run-with-idle-timer 2 nil #'persist-state--consume fns)))
+  ;; Always act like we crash (good battle test, and fast restarts!)
+  (advice-add #'kill-emacs :before
+              (lambda (&rest _) (setq kill-emacs-hook nil)))
+  ;; Save more often due to the nulled kill-emacs-hook
+  (setq persist-state-save-interval 150)
+  (setq persist-state-wait-idle 10)
+  (after! org-persist
+    (add-hook 'persist-state-saving-functions #'org-persist-gc)
+    (add-hook 'persist-state-saving-functions #'org-persist-write-all))
+  (after! org-id
+    (add-hook 'persist-state-saving-functions #'me/persist-state--maybe-sync-org-id-locations))
+  (after! transient
+    (add-hook 'persist-state-saving-functions #'transient-maybe-save-history))
+  (after! persist
+    (add-hook 'persist-state-saving-functions #'persist--save-all))
+  ;; Remove a function that sometimes prompts for input, especially with
+  ;; several emacs instances active
+  (remove-hook 'persist-state-saving-functions #'persist-state--maybe-save-bookmarks)
+  (persist-state-mode))
 
 (use-package editorconfig
   :config
   (editorconfig-mode))
 
-(use-package elfeed
-  :defer
-  :config
-  (setq elfeed-db-directory (concat user-emacs-directory "elfeed/db/")
-        elfeed-enclosure-default-dir (concat user-emacs-directory "elfeed/enclosures/"))
-  (make-directory elfeed-db-directory t)
-  (add-hook 'elfeed-new-entry-hook
-            (elfeed-make-tagger :entry-title (rx (or "MCMXXX"
-                                                     "A&R"))
-                                :add 'junk))
-  (setopt elfeed-curl-max-connections 1)
-  (setopt elfeed-search-filter "@2-months-ago -junk +unread"))
+;; (use-package elfeed
+;;   :defer
+;;   :config
+;;   (setq elfeed-db-directory (concat user-emacs-directory "elfeed/db/")
+;;         elfeed-enclosure-default-dir (concat user-emacs-directory "elfeed/enclosures/"))
+;;   (make-directory elfeed-db-directory t)
+;;   (add-hook 'elfeed-new-entry-hook
+;;             (elfeed-make-tagger :entry-title (rx (or "MCMXXX"
+;;                                                      "A&R"))
+;;                                 :add 'junk))
+;;   (setopt elfeed-curl-max-connections 1)
+;;   (setopt elfeed-search-filter "@2-months-ago -junk +unread"))
 
-(use-package elfeed-org
-  :after elfeed
-  :config
-  (setopt rmh-elfeed-org-files
-          '("/home/kept/roam/contemporaries.org"))
-  (elfeed-org))
+;; (use-package elfeed-org
+;;   :after elfeed
+;;   :config
+;;   (setopt rmh-elfeed-org-files
+;;           '("/home/kept/roam/contemporaries.org"))
+;;   (elfeed-org))
 
 (use-package embark
   :defer
@@ -408,8 +473,6 @@
   ;;   (require 'esh-mode)
   ;;   (require 'em-hist))
 
-  (setopt eshell-prompt-function (lambda () "〈 ／／ 〉 "))
-  (setopt eshell-prompt-regexp "^〈 .*? 〉 ")
   (setopt eshell-show-lisp-completions t)
   (setopt eshell-scroll-show-maximum-output nil) ;; ??
   (setopt eshell-scroll-to-bottom-on-output 'this)
@@ -506,7 +569,7 @@
   (setopt ess-eval-visibly 'nowait)
   (me/unihook ess-r-mode-hook (ess-set-style 'RStudio)))
 
-(use-package eva
+(use-package eva :disabled
   :ensure (:repo "/home/kept/emacs/eva" :branch "dev"
                  :files (:defaults "assets" "renv" "*.R" "*.gnuplot"))
   :init
@@ -529,23 +592,23 @@
   (add-hook 'eva-after-load-vars-hook #'eva-check-dangling-clock)
   (add-hook 'eva-after-load-vars-hook #'eva-check-org-vars)
   (eva-defun me/eva-present-outcomes-or-agenda ()
-    (require 'org-agenda)
-    (require 'org-id)
-    (message (eva-emit "Here are your Org'd thoughts."))
-    (sit-for eva-sit-short)
-    (if (> (ts-hour (ts-now)) 18)
-        ;; Late in the day is more of a review-time, so show agenda
-        (progn
-          (org-agenda-list)
-          (push (current-buffer) eva-excursion-buffers))
-      ;; Still early, so show desired outcomes and task ideas
-      (org-id-goto "3ec7f712-2437-4222-8905-72d39ba6188a")
-      (push (current-buffer) eva-excursion-buffers)
-      (if (one-window-p) (split-window))
-      (other-window 1)
-      (org-id-goto "c55ab064-0db2-4556-aa24-0c3c8dce9e76")
-      (push (current-buffer) eva-excursion-buffers))
-    (eva-stop-queue))
+             (require 'org-agenda)
+             (require 'org-id)
+             (message (eva-emit "Here are your Org'd thoughts."))
+             (sit-for eva-sit-short)
+             (if (> (ts-hour (ts-now)) 18)
+                 ;; Late in the day is more of a review-time, so show agenda
+                 (progn
+                   (org-agenda-list)
+                   (push (current-buffer) eva-excursion-buffers))
+               ;; Still early, so show desired outcomes and task ideas
+               (org-id-goto "3ec7f712-2437-4222-8905-72d39ba6188a")
+               (push (current-buffer) eva-excursion-buffers)
+               (if (one-window-p) (split-window))
+               (other-window 1)
+               (org-id-goto "c55ab064-0db2-4556-aa24-0c3c8dce9e76")
+               (push (current-buffer) eva-excursion-buffers))
+             (eva-stop-queue))
   (setq eva-items
         (list
          (eva-item-create :fn #'eva-greet
@@ -559,8 +622,8 @@
          ;; you can inline define the functions too
          (eva-item-create
           :fn (eva-defun my-bye ()
-                (message (eva-emit "All done for now."))
-                (bury-buffer (eva-buffer-chat)))
+                         (message (eva-emit "All done for now."))
+                         (bury-buffer (eva-buffer-chat)))
           :min-hours-wait 0)))
   (transient-replace-suffix 'eva-dispatch '(0)
     '["General actions"
@@ -620,7 +683,13 @@
   (global-set-key [remap find-dired] #'fd-dired))
 
 (use-package forge
-  :after magit)
+  :defer
+  :config
+  ;; I really need my CAPFs to be instant
+  (advice-add forge-bug-reference-setup :after
+              (lambda ()
+                (remove-hook 'completion-at-point-functions
+                             #'forge-topic-completion-at-point t))))
 
 (use-package form-feed
   :config
@@ -632,8 +701,8 @@
   (setq gcmh-high-cons-threshold (* 15 1000 1000))
   (gcmh-mode))
 
-(use-package goggles
-  :hook ((prog-mode text-mode) . goggles-mode))
+;; (use-package goggles
+;;   :hook ((prog-mode text-mode) . goggles-mode))
 
 (use-package gif-screencast
   :defer
@@ -642,6 +711,12 @@
   ;; (setq gif-screencast-program "spectacle")
   ;; (setq gif-screencast-args (list "-anbo"))
   )
+
+(use-package go-mode
+  :defer)
+
+;; (use-package tree-sitter-auto
+;;   :config (global-treesit-auto-mode))
 
 (use-package helm :disabled
   :defer
@@ -709,8 +784,14 @@
   ;; (add-to-list 'inline-anki-ignore-file-regexps "/daily/")
   )
 
+(elpaca git-commit)
+
 (use-package magit
-  :defer)
+  :requires git-commit
+  :defer
+  :init
+  ;; https://magit.vc/manual/magit/Performance.html
+  (setq magit-refresh-status-buffer nil))
 
 (use-package marginalia
   :config
@@ -765,8 +846,8 @@
   :defer
   :init
   (setq org-time-stamp-custom-formats (cons "%Y-%b-%d" "%Y-%m-%d %a %H:%M"))
-  (after! org
-    (setq org-time-stamp-formats (cons "%Y-%m-%d" "%Y-%m-%d %a %H:%M")))
+  ;; (after! org
+  ;; (setq org-time-stamp-formats (cons "%Y-%m-%d" "%Y-%m-%d %a %H:%M")))
   (setq org-pretty-entities t)
   (setq org-archive-location "/home/kept/roam/noagenda/archive.org::datetree/")
   (setq org-clock-persist t)
@@ -890,6 +971,7 @@
   ;; (setopt org-agenda-tag-filter-preset '("-exclude"))
   )
 
+
 (use-package org-journal :disabled
   :config
   (add-hook 'org-journal-after-header-create-hook #'org-node-nodeify-entry)
@@ -905,16 +987,16 @@
   )
 
 (use-package org-node-fakeroam
-  :ensure (:repo "meedstrom/org-node"
-                 :fetcher github
-                 :files ("org-node-fakeroam.el"))
+  :ensure (:fetcher github :repo "meedstrom/org-node"
+                    :files ("org-node-fakeroam.el")
+                    :branch "main")
   :after org-node
   :requires org-node)
 
 (use-package org-node
-  :ensure (:repo "meedstrom/org-node"
-                 :fetcher github
-                 :files (:defaults (:exclude "org-node-fakeroam.el")))
+  :ensure (:fetcher github :repo "meedstrom/org-node"
+                    :files (:defaults (:exclude "org-node-fakeroam.el"))
+                    :branch "main")
   :after org
   :config
   ;; (add-hook 'org-mode-hook #'org-node-backlink-mode)
@@ -922,6 +1004,37 @@
   (setq org-node-extra-id-dirs '("/home/kept/roam/" "/home/me/.doom.d/"))
   (setq org-node-renames-allowed-dirs '("/home/kept/roam/"))
   (add-hook 'after-save-hook 'org-node-rename-file-by-title)
+  (setq org-read-date-prefer-future nil)
+  (setq org-node-series-defs
+        (list
+         (org-node-mk-series-on-tag-by-property
+          "w" "My public notes (visible on the web)" "pub" "CREATED")
+         '("d" :name "Daily-files"
+           :version 2
+           :classifier (lambda (node)
+                         (let ((path (org-node-get-file-path node)))
+                           (when (string-search (org-node--guess-daily-dir) path)
+                             (let ((ymd (org-node-helper-filename->ymd path)))
+                               (when ymd
+                                 (cons ymd path))))))
+           :whereami (lambda ()
+                       (org-node-helper-filename->ymd buffer-file-name))
+           :prompter (lambda (key)
+                       ;; Tip: Consider `org-read-date-prefer-future' nil
+                       (let ((org-node-series-that-marks-calendar key))
+                         (org-read-date)))
+           :try-goto (lambda (item)
+                       (org-node-helper-try-visit-file (cdr item)))
+           :creator (lambda (sortstr key)
+                      (let ((org-node-datestamp-format "")
+                            (org-node-slug-fn (lambda (&rest _) sortstr))
+                            (org-node-ask-directory (org-node--guess-daily-dir)))
+                        (org-node-create (format-time-string
+                                          "%Y-%b-%d"
+                                          (org-time-string-to-time sortstr))
+                                         (org-id-new)
+                                         key))))))
+
   ;; (setq org-node--debug nil)
   ;; (setopt org-node-perf-eagerly-update-link-tables t)
   ;; (setopt org-node-perf-assume-coding-system 'utf-8-auto-unix)
@@ -929,6 +1042,8 @@
   ;; (setopt org-node-prefer-with-heading t)
   ;; (setopt org-node-slug-fn #'org-node-slugify-like-roam-default)
   ;; (setopt org-node-datestamp-format "%Y%m%dT%H%M%S--")
+  ;; (setopt org-node-datestamp-format "%Y%m%d%H%M%S-")
+  ;; (setopt org-node-datestamp-format "")
   ;; (setopt org-node-slug-fn #'org-node-slugify-for-web)
   ;; (setq org-node-creation-fn #'org-capture)
   ;; (setopt org-node-creation-fn #'org-node-new-via-roam-capture)
@@ -949,7 +1064,9 @@
   (org-node-backlink-global-mode)
   (org-node-fakeroam-jit-backlinks-mode)
   (org-node-fakeroam-redisplay-mode)
-  ;; (org-node-complete-at-point-mode)
+  (org-node-fakeroam-fast-render-mode)
+
+  (org-node-complete-at-point-mode)
   ;; (org-node-fakeroam-db-feed-mode)
 
   ;; Make sure the extracted subtree inherits any CREATED property,
@@ -1062,7 +1179,7 @@
 
   ;; Still haven't really used these
   (keymap-set global-map "C-M-a" #'sp-backward-down-sexp)
-  (keymap-set smartparens-mode-map "C-k" #'sp-kill-hybrid-sexp)
+  (keymap-set smartparens-mode-map "C-k" #'mstrom/sp-kill-hybrid-sexp)
   (keymap-set global-map "C-M-e" #'sp-up-sexp)
   (keymap-set global-map "C-M-u" #'sp-backward-up-sexp)
   (keymap-set global-map "C-'" #'sp-mark-sexp)
@@ -1094,10 +1211,6 @@
   )
 
 (use-package svelte-mode)
-
-;; Magit requires high transient version but elpaca did not install it
-(setq elpaca-ignored-dependencies
-      (delq 'transient elpaca-ignored-dependencies))
 
 ;; (use-package transient)
 
@@ -1151,8 +1264,10 @@
 ;; Some load paths
 (dolist (dir '("/home/kept/emacs/key-seqs-finder/"
                "/home/kept/emacs/lintorg/"
-               "/home/kept/emacs/twee-mode/"))
+               "/home/kept/emacs/twee-mode/"
+               "/home/kept/emacs/nbt/"))
   (add-to-list 'load-path dir))
+(require 'nbt)
 
 ;; TODO: Periodically re-test internet connectivity and set this, would be
 ;; useful for `my-stim' among other commands.
@@ -1497,7 +1612,6 @@
 (keymap-set global-map "<f2> e s" #'ess-eval-region-or-function-or-paragraph-and-step) ;; ess everywhere
 (keymap-set global-map "<f2> e x" #'eval-expression)
 (keymap-set global-map "<f2> m" #'my-last-daily-file)
-(keymap-set global-map "<f2> n" #'org-roam-dailies-capture-today)
 (keymap-set global-map "<f2> z" #'my-sleep)
 (keymap-set global-map "<f3> f d" #'me/delete-this-file)
 
@@ -1516,6 +1630,7 @@
 (keymap-set global-map "C-2" #'other-window)
 (keymap-set global-map "C-3" #'unexpand-abbrev)
 (keymap-set global-map "C-4" #'my-stim)
+(keymap-set global-map "M-o m" #'org-node-fakeroam-show-roam-buffer)
 (keymap-set global-map "C-5" #'my-prev-file-in-dir)
 (keymap-set global-map "C-6" #'my-next-file-in-dir)
 (keymap-set global-map "C-8" #'kill-whole-line)
@@ -1599,6 +1714,13 @@
 (keymap-set global-map "M-o b" #'backup-walker-start)
 (keymap-set global-map "M-o c" #'org-capture)
 (keymap-set global-map "M-o d" #'my-insert-today)
+(keymap-set global-map "M-o t"
+            (defun my-goto-today ()
+              (interactive)
+              (org-node-series-goto "d" (format-time-string "%F"))
+              (goto-char (point-max))
+              (org-insert-heading)
+              (insert (format-time-string "%H:%M"))))
 (keymap-set global-map "M-o f" #'org-node-find)
 (keymap-set global-map "M-o h" #'consult-find)
 (keymap-set global-map "M-o i" #'org-node-insert-link)
@@ -1993,6 +2115,44 @@
           (setq mutually-recursed-once nil))))))
 
 
+;;; Progressively preload packages in the background
+
+(add-hook 'elpaca-after-init-hook
+          (defun me/progressive-preload ()
+            (while-no-input
+              (while-let ((next-lib (pop me/progressive-preload-queue)))
+                (require next-lib nil t)))
+            (if me/progressive-preload-queue
+                (run-with-idle-timer 2 nil #'me/progressive-preload)))
+          99)
+
+(defvar me/progressive-preload-queue
+  '(dired
+    org
+    org-agenda
+    elisp-mode
+    comint
+    eshell
+    esh-mode
+    em-alias
+    em-banner
+    em-basic
+    em-cmpl
+    em-elecslash
+    em-extpipe
+    em-hist
+    em-ls
+    em-pred
+    em-prompt
+    em-rebind
+    em-script
+    em-smart
+    em-term
+    em-tramp
+    em-unix
+    em-xtra))
+
+
 ;;;; Experiment zone
 
 (setopt helpful-max-buffers nil) ;; what's the point of killing buffers
@@ -2049,43 +2209,14 @@
                       (inhibit-message t))
                   (recentf-save-list)))))
 
-
-;;; Progressively preload packages in the background
 
-(add-hook 'elpaca-after-init-hook
-          (defun me/progressive-preload ()
-            (while-no-input
-              (while-let ((next-lib (pop me/progressive-preload-queue)))
-                (require next-lib nil t)))
-            (if me/progressive-preload-queue
-                (run-with-idle-timer 2 nil #'me/progressive-preload)))
-          99)
+;; Python
+;; (use-package pyvenv)
+(use-package pyvenv-auto
+  :hook ((python-mode . pyvenv-auto-run)))
+(use-package anaconda-mode)
+(add-to-list 'major-mode-remap-alist '(python-mode . python-ts-mode))
 
-(defvar me/progressive-preload-queue
-  '(dired
-    org
-    org-agenda
-    elisp-mode
-    comint
-    eshell
-    esh-mode
-    em-alias
-    em-banner
-    em-basic
-    em-cmpl
-    em-elecslash
-    em-extpipe
-    em-hist
-    em-ls
-    em-pred
-    em-prompt
-    em-rebind
-    em-script
-    em-smart
-    em-term
-    em-tramp
-    em-unix
-    em-xtra))
 
 ;; Local Variables:
 ;; no-byte-compile: t

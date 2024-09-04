@@ -46,6 +46,9 @@
 ;; Timestamp for when the command was sent (not when the prompt opened)
 (add-hook 'eshell-pre-command-hook #'my-esh-timestamp-update)
 
+(setopt eshell-prompt-function (lambda () "〈 ／／ 〉 "))
+(setopt eshell-prompt-regexp "^〈 .*? 〉 ")
+
 ;;; Lib:
 
 (defvar my-esh-buffer-counter 0)
