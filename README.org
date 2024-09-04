@@ -2,6 +2,6 @@
 
 In development since 2015.  Requires Emacs 29+ and uses Elpaca.
 
-Most of the meat is in [[https://github.com/meedstrom/dotemacs/blob/master/late-init.el][late-init.el]] and [[https://github.com/meedstrom/dotemacs/tree/master/semi-packaged][semi-packaged]].
+Most of the meat is in [[https://github.com/meedstrom/dotemacs/blob/master/init.el][init.el]] and [[https://github.com/meedstrom/dotemacs/tree/master/self-contained][self-contained]].
 
 In the period 2020-2024, this was a Doom Emacs config ([[https://github.com/meedstrom/doom.d][archived]]).  See its [[https://github.com/meedstrom/doom.d/blob/master/05-undoom.el][05-undoom.el]] for a few places where I disageed with Doom, but on the whole it paid for itself.  I left because I finally tired having to open a terminal and type =doom sync -u= and wait 20 minutes for Straight to upgrade 300 packages...
