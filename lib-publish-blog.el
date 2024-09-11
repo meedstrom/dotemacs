@@ -122,6 +122,7 @@ scanned."
   (setq kill-buffer-query-functions nil)
   (setq buffer-list-update-hook nil)
 
+  ;; Lintorg is an unpublished linter, made before I knew about org-lint
   (setq lintorg-on-front-matter-hook
         '(lintorg-local-entry/assert-id
           lintorg-local-entry/assert-created-if-id
@@ -171,8 +172,8 @@ scanned."
     (my-generate-todo-log "/tmp/roam/org/todo-log.org"))
 
   ;; Ensure that each post URL will contain a unique page ID by now placing
-  ;; them in subdirectories named by that ID, so org-export will translate all
-  ;; org-id links into these relative filesystem paths.
+  ;; them in subdirectories named by that ID, since org-export will translate
+  ;; all org-id links into these relative filesystem paths.
   (cl-loop for path in (directory-files-recursively "/tmp/roam/org/" "\\.org$")
            do (if (and (not (string-search ".sync-conflict-" path))
                        (not (string-search "/logseq/" path)))
