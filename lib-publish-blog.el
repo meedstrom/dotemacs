@@ -193,22 +193,22 @@ scanned."
   (setq org-roam-db-location "/tmp/roam/org-roam.db")
   (setq org-agenda-files '("/tmp/roam/org/"))
   (setq org-id-locations-file "/tmp/roam/org-id-locations")
-  ;; Handle C-u
-  (remove-hook 'my-org-roam-pre-scan-hook #'lintorg-lint)
-  (when (equal current-prefix-arg '(4))
-    (shell-command "rm /tmp/roam/org-roam.db")
-    (me/wipe-org-id))
-  (when (equal current-prefix-arg '(16))
+
+  ;; With C-u, wipe databases so they get rebuilt
+  (when current-prefix-arg
     (shell-command "rm /tmp/roam/org-roam.db")
     (me/wipe-org-id)
-    (add-hook 'my-org-roam-pre-scan-hook #'lintorg-lint))
+    ;; With C-u C-u, lint too
+    (if (equal current-prefix-arg '(16))
+        (add-hook 'my-org-roam-pre-scan-hook #'lintorg-lint)
+      (remove-hook 'my-org-roam-pre-scan-hook #'lintorg-lint)))
 
   (unless (file-exists-p org-roam-db-location)
     (org-id-update-id-locations) ;; find files with ROAM_EXCLUDE too
     (org-roam-update-org-id-locations)
     (org-roam-db-sync 'force))
 
-  ;; Reset the work output
+  ;; Wipe previous work output
   (shell-command "rm -rf /tmp/roam/{html,json,atom}/")
   (shell-command "mkdir -p /tmp/roam/{html,json,atom}")
   (clrhash my-ids)
@@ -219,12 +219,12 @@ scanned."
   (add-hook 'org-export-before-parsing-functions #'my-strip-inline-anki-ids)
   (add-hook 'org-export-before-parsing-functions #'org-transclusion-mode 1)
   (add-hook 'org-export-before-parsing-functions
-            ;; other hooks try to manipulate the transcluded areas
+            ;; Let hooks manipulate the transcluded areas (usually read-only)
             (lambda (&rest _) (setq buffer-read-only nil)) 2)
   (add-hook 'org-export-before-parsing-functions #'my-add-backlinks 10)
   (add-hook 'org-export-before-parsing-functions #'my-ensure-section-containers 20)
 
-  (org-publish "my-slipbox-blog" t)
+  (org-publish "my-slipbox-blog" t) ;; Main. Runs the rest of this file.
   (my-check-id-collisions)
   (my-compile-atom-feed "/tmp/roam/posts.atom" "/tmp/roam/atom/")
   (find-file "/home/kept/pub/")
@@ -268,7 +268,7 @@ through to `org-html-publish-to-html'."
       (cl-assert (memq (buffer-local-value 'buffer-undo-list open) '(t nil)))
       (kill-buffer open))
     (when (= 0 (% (cl-incf my-publish-ctr) 200))
-      ;; Reap open file handles (max 1024 on many distros, also in Emacs)
+      ;; Reap open file handles (max 1024 on many distros, and in Emacs)
       (garbage-collect))
     (with-current-buffer (find-file-noselect filename)
       (goto-char (point-min))
