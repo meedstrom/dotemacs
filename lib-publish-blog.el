@@ -1,16 +1,27 @@
 ;;; lib-publish-blog.el -- Publishing to edstrom.dev -*- lexical-binding: t; -*-
 
+(setq org-modules '(org-id))
+(require 'org-roam)
+(require 'org-agenda)
+(require 'ox-publish)
+(require 'dom)
+(require 'prism)
+(require 'dash)
+(require 'kv)
+(require 'lintorg)
+
 (defvar my-tags-to-avoid-uploading '("noexport" "archive" "private" "censor"))
 (defvar my-tags-for-hiding '("gri" "shrink" "privy" "lover" "fren"))
 (defvar my-tags-for-publishing (cons "pub" my-tags-for-hiding))
+
 
 ;; TODO: Upstream
 ;; Override the info: link type so it won't get exported into an empty <a href>
 ;; with not even a link description.  What nasty default behavior!  See
 ;; `org-link-parameters' if I need the same treatment for more link types.
-(after! ol-info
-  (defun org-info-export (path desc _format)
-    (or desc path)))
+(require 'ol-info)
+(defun org-info-export (path desc _format)
+  (or desc path))
 
 ;; TODO: Upstream
 ;; Give each h2...h6 heading (and its container div) an ID attribute that
@@ -34,14 +45,7 @@ code, but not the notes).
 With C-u C-u, also run `my-validate-org-buffer' on each file
 scanned."
   (interactive)
-  (require 'org-roam)
-  (require 'org-agenda)
-  (require 'ox-publish)
-  (require 'f)
-  (require 'prism)
-  (require 'dash)
-  (require 'kv)
-  (require 'lintorg)
+
   (view-echo-area-messages) ;; for watching it work
   (setq org-export-use-babel nil)
   (setq org-export-with-broken-links nil) ;; links would disappear quietly!
@@ -61,7 +65,6 @@ scanned."
           (keyword "transclude")))
 
   ;; Speed up publishing
-  (gcmh-mode 0)
   (setq gc-cons-threshold (* 5 1000 1000 1000))
   (fset 'org-publish-write-cache-file #'ignore) ;; mega speedup!
   (setq file-name-handler-alist nil)
@@ -81,25 +84,38 @@ scanned."
                                  awesome-tray-mode
                                  beginend-global-mode
                                  better-jumper-mode
+                                 column-number-mode
                                  context-menu-mode
+                                 delete-selection-mode
                                  diff-hl-flydiff-mode
+                                 dired-async-mode
                                  dired-hist-mode
+                                 display-battery-mode
                                  editorconfig-mode
                                  electric-indent-mode
+                                 elpaca-use-package-mode
                                  eva-mode
+                                 file-name-shadow-mode
+                                 gcmh-mode
+                                 global-corfu-mode
                                  global-diff-hl-mode
                                  global-eldoc-mode
                                  global-emojify-mode
+                                 global-font-lock-mode
                                  global-form-feed-mode
                                  global-ligature-mode
                                  global-prettify-symbols-mode
+                                 magit-auto-revert-mode
+                                 marginalia-mode
+                                 minibuffer-regexp-mode
                                  my-auto-commit-mode
                                  nerd-icons-completion-mode
-                                 org-node-cache-mode
                                  org-node-backlink-global-mode
+                                 org-node-cache-mode
                                  org-node-complete-at-point-mode
                                  org-node-fakeroam-db-feed-mode
-                                 org-node-fakeroam-nosql-mode
+                                 org-node-fakeroam-fast-render-mode
+                                 org-node-fakeroam-jit-backlinks-mode
                                  org-node-fakeroam-redisplay-mode
                                  pixel-scroll-precision-mode
                                  projectile-mode
@@ -110,6 +126,8 @@ scanned."
                                  show-paren-mode
                                  smartparens-global-mode
                                  solaire-global-mode
+                                 tooltip-mode
+                                 transient-mark-mode
                                  window-divider-mode
                                  winner-mode
                                  ws-butler-global-mode))
@@ -148,7 +166,7 @@ scanned."
           ))
 
   ;; For hygiene, ensure that this subordinate emacs syncs nothing to disk
-  (eager-state-preempt-kill-emacs-hook-mode 0)
+  (persist-state-mode 0)
   (setq kill-emacs-hook nil)
 
   ;; Switch theme for 2 reasons
@@ -189,10 +207,11 @@ scanned."
                 (delete-file path)))
 
   ;; Tell `org-id-locations' and the org-roam DB about the new work directory
-  (setq org-roam-directory "/tmp/roam/org/")
-  (setq org-roam-db-location "/tmp/roam/org-roam.db")
-  (setq org-agenda-files '("/tmp/roam/org/"))
   (setq org-id-locations-file "/tmp/roam/org-id-locations")
+  (setq org-roam-db-location "/tmp/roam/org-roam.db")
+  (setq org-roam-directory "/tmp/roam/org/")
+  (setq org-node-extra-id-dirs '("/tmp/roam/org/"))
+  (setq org-agenda-files '("/tmp/roam/org/"))
 
   ;; With C-u, wipe databases so they get rebuilt
   (when current-prefix-arg
@@ -204,9 +223,12 @@ scanned."
       (remove-hook 'my-org-roam-pre-scan-hook #'lintorg-lint)))
 
   (unless (file-exists-p org-roam-db-location)
+    ;; (org-node-cache-ensure t t)
+    ;; (org-node-fakeroam-db-rebuild)
     (org-id-update-id-locations) ;; find files with ROAM_EXCLUDE too
     (org-roam-update-org-id-locations)
-    (org-roam-db-sync 'force))
+    (org-roam-db-sync 'force)
+    )
 
   ;; Wipe previous work output
   (shell-command "rm -rf /tmp/roam/{html,json,atom}/")

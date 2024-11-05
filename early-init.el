@@ -41,6 +41,29 @@
    (file-name-as-directory
     (file-name-concat user-emacs-directory "var" "eln-cache"))))
 
+;;; Stuff to try from https://github.com/jamescherti/minimal-emacs.d/
+
+;; ;; Reduce rendering/line scan work by not rendering cursors or regions in
+;; ;; non-focused windows.
+;; (setq-default cursor-in-non-selected-windows nil)
+;; (setq highlight-nonselected-windows nil)
+
+;; ;; Don't ping things that look like domain names.
+;; (setq ffap-machine-p-known 'reject)
+
+;; ;; Disable warnings from the legacy advice API. They aren't useful.
+;; (setq ad-redefinition-action 'accept)
+
+;; ;; By default, Emacs "updates" its ui more often than it needs to
+;; (setq idle-update-delay 1.0)
+
+;; ;; Font compacting can be very resource-intensive, especially when rendering
+;; ;; icon fonts on Windows. This will increase memory usage.
+;; (setq inhibit-compacting-font-caches t)
+
+;; (setq initial-major-mode 'fundamental-mode)
+;; (setq initial-scratch-message nil)
+
 ;; Local Variables:
 ;; no-byte-compile: t
 ;; no-native-compile: t

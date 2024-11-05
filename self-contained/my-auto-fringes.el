@@ -23,7 +23,7 @@
 ;;     (cons n-windows-possible (/ leftover-px-per-window 2))))
 ;; ;; (set-fringe-mode (cdr (fringe-from-fill-column)))
 
-(defun window-leftover-px-after-satisfying-fill-column ()
+(defun my-window-leftover-px-after-satisfying-fill-column ()
   (let* ((pixels-per-char (/ (window-pixel-width) (window-total-width)))
          (window-minimum-px (* (1+ fill-column) pixels-per-char)))
     (- (window-pixel-width) window-minimum-px)))
@@ -37,37 +37,47 @@
 ;; that would result in F-2F-F.  Don't really need code to cover that since it
 ;; seems extremely hard to end up in that situation and those ppl can live with
 ;; it.
-(defun pad-fringes-to-fill-column (&rest _)
+
+
+(defvar fif--modes-to-reverse '(window-divider-mode))
+
+(defun fif--pad-fringes-to-fill-column (&rest _)
   (interactive)
   (cond
    ;; In horizontal group
-   ((window-combined-p (selected-window) t)
-    (let ((and-siblings (cddar (window--subtree (window-parent)))))
+   ((or (window-combined-p (selected-window) t) ;; horiz
+        (window-combined-p (selected-window))) ;; vert
+    (let ((siblings (cddar (window--subtree (window-parent)))))
       (if (>= fill-column (window-total-width))
           ;; Fallback if the window is already insufficient for fill-column.
-          ;; Here we could do something clever like temporarily decrease
-          ;; the font size...  But no.  Eliminate fringes.
-          (dolist (win and-siblings)
+          (dolist (win siblings)
             (with-selected-window win
-              (set-window-fringes (selected-window) 0)
-              (unless window-divider-mode
-                (window-divider-mode))))
-        (dolist (win and-siblings)
+              (set-window-fringes win nil nil)
+              (dolist (mode fif--modes-to-reverse)
+                (funcall mode))))
+        (dolist (win siblings)
           (with-selected-window win
-            (let ((max-px (window-leftover-px-after-satisfying-fill-column)))
+            (let ((max-px (my-window-leftover-px-after-satisfying-fill-column)))
               (set-window-fringes (selected-window) (/ max-px 2) (/ max-px 2) t)
-              (when window-divider-mode
-                (window-divider-mode 0))))))))
+              (dolist (mode fif--modes-to-reverse)
+                (funcall mode 0))))))))
    ;; In vertical group
    ((window-combined-p (selected-window))
     )
    ;; No group; must be root window
    ((frame-root-window-p (selected-window))
-    (let ((max-px (window-leftover-px-after-satisfying-fill-column)))
+    (let ((max-px (my-window-leftover-px-after-satisfying-fill-column)))
       (set-window-fringes (selected-window) (/ max-px 2) (/ max-px 2))))
+   ((window-minibuffer-p))
    (t
     (message "pad-fringes-to-fill-column: Not expected to be here"))))
 
+(defun undo-fringes-a (fn &rest args)
+  (walk-windows (lambda (win) (set-window-fringes win nil nil)))
+  (apply fn args)
+  (walk-windows (lambda (win) (fif--pad-fringes-to-fill-column))))
 
-;; (add-hook 'window-size-change-functions #'pad-fringes-to-fill-column)
-;; (add-hook 'window-buffer-change-functions #'pad-fringes-to-fill-column)
+;; (advice-add 'split-window :around 'undo-fringes-a)
+;; (advice-add 'delete-window :around 'undo-fringes-a)
+;; (remove-hook 'window-size-change-functions #'fif--pad-fringes-to-fill-column)
+;; (remove-hook 'window-buffer-change-functions #'fif--pad-fringes-to-fill-column)

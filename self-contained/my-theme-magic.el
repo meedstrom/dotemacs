@@ -52,19 +52,23 @@
   '(doom-flatwhite
     ef-cyprus
     ef-arbutus
+    ef-eagle
     ef-day))
 
 (defvar me/okay-themes-night
-  '(doom-pine
-    doom-one
+  '(doom-one
     doom-tomorrow-night
     doom-dark+
     doom-manegarm
+    doom-bluloco-dark
     doom-Iosvkem
+    doom-nord
     ef-bio
     ef-rosa
     ef-dream
     ef-cherie
+    ef-melissa-dark
+    ef-elea-dark
     doom-sourcerer
     doom-zenburn
     doom-outrun-electric
@@ -81,10 +85,9 @@
     doom-solarized-dark-high-contrast
     doom-rouge))
 
-;; Bonus.  Switch themes WITHOUT closing minibuffer (like Helm)!
-;; Here's how.  Let's assume C-; is bound to embark-act.  Eval this.
-;; Then type M-x me/load-theme.  Then when selecting a theme, DON'T press RET!
-;; Type C-; C-m instead.
+;; Bonus.  Switch themes WITHOUT closing minibuffer (like Helm)!  Here's how.
+;; If C-; is bound to embark-act, type M-x me/load-theme.  Then when selecting
+;; a theme, don't type RET!  Type C-; C-m instead.
 (setq embark-quit-after-action
       '((me/load-theme . nil)
         (t . t)))

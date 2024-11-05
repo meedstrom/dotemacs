@@ -3,7 +3,9 @@
 ;;; Init Elpaca, a package manager (using snippet from their README)
 (defvar elpaca-installer-version 0.7)
 (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
-(defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
+;; CUSTOM
+(defvar elpaca-builds-directory
+  (expand-file-name (concat "builds" emacs-version "/") elpaca-directory))
 (defvar elpaca-repos-directory (expand-file-name "repos/" elpaca-directory))
 (defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
                               :ref nil :depth 1
@@ -39,33 +41,27 @@
 (add-hook 'after-init-hook #'elpaca-process-queues)
 (elpaca `(,@elpaca-order))
 
-;; Reduce to minimum set of ignores, to upgrade all upgradables on demand
-(setq elpaca-ignored-dependencies
-      (append
-       '(cl-lib cl-generic nadvice) ;; downgrades in disguise
-       (cl-loop
-        for dep in elpaca-ignored-dependencies
-        when (let ((repo (plist-get (elpaca-recipe dep) :repo)))
-               (or (not repo)
-                   (equal repo "https://github.com/emacs-mirror/emacs")))
-        collect dep)))
-
-;; Some builtins must be upgraded specially for now (map, seq, tramp,...)
-;; https://github.com/progfolio/elpaca/issues/216
-(elpaca `(seq :build
-              ,(append (butlast (if (file-exists-p
-                                     (file-name-concat elpaca-builds-directory
-                                                       "seq"))
-                                    elpaca--pre-built-steps
-                                  elpaca-build-steps))
-                       (list (lambda (e)
-                               (when (featurep 'seq) (unload-feature 'seq t))
-                               (elpaca--continue-build e))
-                             'elpaca--activate-package))))
+;; (when (>= emacs-major-version 30)
+;;   ;; Reduce to minimum set of ignores, to upgrade all upgradables on demand
+;;   (setq elpaca-ignored-dependencies
+;;         (append
+;;          ;; Downgrades-in-disguise
+;;          '(cl-lib cl-generic nadvice use-package bind-key)
+;;          ;; Need special upgrade steps for now (#216)
+;;          '(seq map tramp)
+;;          ;; No repo, or repo is the GNU Emacs repo (250 MB download)
+;;          (cl-loop
+;;           for dep in elpaca-ignored-dependencies
+;;           when (let ((repo (plist-get (elpaca-recipe dep) :repo)))
+;;                  (or (not repo)
+;;                      (equal repo "https://github.com/emacs-mirror/emacs")))
+;;           collect dep)))
+;;   (delq 'eglot elpaca-ignored-dependencies))
 
 ;; Setup use-package
 (elpaca elpaca-use-package
   (setopt use-package-always-ensure t)
+  (setopt use-package-enable-imenu-support t)
   (setopt use-package-compute-statistics t)
   (if init-file-debug
       (setopt use-package-verbose t)
@@ -76,41 +72,41 @@
 ;; Require packages I need during init
 (use-package no-littering)
 (elpaca-wait)
+;; (use-package on :ensure (:fetcher gitlab :repo "ajgrf/on.el"))
 (use-package defrepeater)
-(use-package crux) 
-(use-package dash) 
+(use-package crux)
+(use-package dash)
 (elpaca-wait)
 
 ;; Load some separated-out initfiles
 (let ((default-directory user-emacs-directory))
   (dolist (file (directory-files "self-contained/" t "^\\w.*\\.el"))
-    (load-file file))
-  (load-file (setq custom-file "custom.el")))
+    (load-file file)))
+(load-file (setq custom-file (locate-user-emacs-file "custom.el")))
 
 
 ;;;; Unconfigured packages
 
 ;; Pkg dev
 (elpaca (unpackaged :repo "https://github.com/alphapapa/unpackaged.el"))
-(elpaca flycheck-package)
 (elpaca help-find)
 (elpaca htmlize)
 (elpaca keymap-utils) ;; prefix kmu-*
 (elpaca kv)
 (elpaca package-lint)
-(elpaca persist)
+;; (elpaca persist)
 (elpaca ts)
 ;; (elpaca sisyphus)
 
 ;; Untried
-(elpaca (casual-avy :repo "https://github.com/kickingvegas/casual-avy"))
-(elpaca (casual-dired :repo "https://github.com/kickingvegas/casual-dired"))
+
+(when (>= emacs-major-version 30)
+  (elpaca (casual-avy :repo "https://github.com/kickingvegas/casual-avy"))
+  (elpaca (casual-dired :repo "https://github.com/kickingvegas/casual-dired")))
 (elpaca dogears)
 ;; (elpaca tree-sitter)
 ;; (elpaca tree-sitter-langs)
 (elpaca ranger)
-;; (elpaca (org-roam-daily-reflection
-;; :fetcher github :repo "emacsomancer/org-roam-daily-reflection"))
 
 ;; The rest
 (elpaca (ess-rproj :repo "https://github.com/chainsawriot/ess-rproj"))
@@ -125,7 +121,6 @@
 (elpaca hacker-typer)
 (elpaca multiple-cursors)
 (elpaca mw-thesaurus)
-(elpaca org-download)
 (elpaca peep-dired)
 (elpaca pinboard-popular)
 (elpaca shelldon)
@@ -206,8 +201,7 @@
   (dired-async-mode))
 
 (use-package asyncloop
-  :ensure (:repo "https://github.com/meedstrom/asyncloop")
-  :defer)
+  :ensure (:fetcher github repo "meedstrom/asyncloop"))
 
 ;; TODO Get Doom's autorevert behavior for dired too
 (use-package autorevert
@@ -254,7 +248,8 @@
   (add-hook 'eglot-managed-mode-hook #'my/eglot-capf))
 
 (use-package combobulate
-  :ensure (:fetcher github :repo "mickeynp/combobulate"))
+  :ensure (:fetcher github :repo "mickeynp/combobulate")
+  :defer)
 
 (use-package consult-dir
   :defer
@@ -379,43 +374,66 @@
 (use-package dired-hacks :disabled
   :init (add-hook 'dired-mode-hook #'dired-collapse-mode))
 
-(use-package persist-state
+(use-package eglot
+  :ensure nil
+  :defer
   :config
+  ;; Use locally-installed NPM packages, not global
+  (cl-loop for item in-ref eglot-server-programs
+           when (equal (car-safe (cdr-safe item)) "typescript-language-server")
+           return (push "npx" (cdr item)))
+  (setf (alist-get 'svelte-mode eglot-server-programs)
+        (list "npx" "svelte-language-server" "--stdio")))
+
+(use-package flycheck
+  :defer
+  :init
+  (setq flycheck-idle-change-delay 50)
+  (setq flycheck-check-syntax-automatically
+        '(save idle-change mode-enabled))
+  (add-hook 'emacs-lisp-mode-hook #'flycheck-mode))
+
+(use-package flycheck-package
+  :after flycheck
+  :config (flycheck-package-setup))
+
+(use-package persist-state
+  :requires asyncloop
+  :config
+  (defvar persist-state--remainder nil)
+  (defun persist-state--consume (loop)
+    (require 'asyncloop)
+    (if (null persist-state--remainder)
+        "Done"
+      (push t (asyncloop-remainder loop))
+      (let ((inhibit-message t)
+            (save-silently t)
+            (standard-output (lambda (&rest _)))
+            (real-write-region (symbol-function #'write-region))
+            (fn (pop persist-state--remainder)))
+        (cl-letf (((symbol-function #'write-region)
+                   (lambda (start end filename &optional append visit lockname mustbenew)
+                     (unless visit (setq visit 'no-message))
+                     (funcall real-write-region start end filename append visit lockname mustbenew))))
+          (funcall fn)
+          fn))))
+
   (defun persist-state--regularly-run-on-idle (f &rest _)
     (run-with-timer persist-state-save-interval
                     persist-state-save-interval
                     f))
   (defun persist-state--save-state ()
-    (run-with-idle-timer
-     persist-state-wait-idle nil
-     #'persist-state--consume (copy-sequence persist-state-saving-functions)))
-  ;; Be quiet and pseudo-async
-  (defun persist-state--consume (fns)
-    ;; Be truly quiet
-    (let ((inhibit-message t)
-          (save-silently t)
-          (standard-output (lambda (&rest _)))
-          (real-write-region (symbol-function #'write-region)))
-      (cl-letf (((symbol-function #'write-region)
-                 (lambda (start end filename &optional append visit lockname mustbenew)
-                   (unless visit (setq visit 'no-message))
-                   (funcall real-write-region start end filename append visit lockname mustbenew))))
-        ;; Break immediately on user activity (potentially dangerous)
-        (while-no-input
-          (while fns (funcall (pop fns))))))
-    ;; Continue consuming list soon if more to do
-    (when fns (run-with-idle-timer 2 nil #'persist-state--consume fns)))
+    (require 'asyncloop)
+    (asyncloop-run
+      '((lambda (_)
+          (setq persist-state--remainder persist-state-saving-functions))
+        persist-state--consume)
+      :log-buffer-name " *persist-state*"))
   ;; Always act like we crash (good battle test, and fast restarts!)
   (advice-add #'kill-emacs :before
               (lambda (&rest _) (setq kill-emacs-hook nil)))
   ;; Save more often due to the nulled kill-emacs-hook
-  (setq persist-state-save-interval 150)
-  (setq persist-state-wait-idle 10)
-  (after! org-persist
-    (add-hook 'persist-state-saving-functions #'org-persist-gc)
-    (add-hook 'persist-state-saving-functions #'org-persist-write-all))
-  (after! org-id
-    (add-hook 'persist-state-saving-functions #'me/persist-state--maybe-sync-org-id-locations))
+  (setq persist-state-save-interval 100)
   (after! transient
     (add-hook 'persist-state-saving-functions #'transient-maybe-save-history))
   (after! persist
@@ -715,9 +733,6 @@
 (use-package go-mode
   :defer)
 
-;; (use-package tree-sitter-auto
-;;   :config (global-treesit-auto-mode))
-
 (use-package helm :disabled
   :defer
   :config
@@ -750,6 +765,7 @@
 (use-package hyperbole :disabled
   :commands hkey-either
   :init
+  (setq hsys-org-enable-smart-keys t)
   ;; (run-with-idle-timer 15 nil #'hyperbole-mode)
   (setq hkey-init nil))
 
@@ -772,6 +788,7 @@
 (use-package inline-anki
   :ensure (:repo "https://github.com/meedstrom/inline-anki")
   :config
+  (add-to-list 'inline-anki-ignore-file-regexps "daily/")
   (setopt inline-anki-send-tags '(not "noexport"
                                       "ARCHIVE"
                                       "stub"
@@ -784,10 +801,17 @@
   ;; (add-to-list 'inline-anki-ignore-file-regexps "/daily/")
   )
 
-(elpaca git-commit)
+(use-package llama
+  :defer
+  :config (global-llama-fontify-mode))
+
+(elpaca transient)
 
 (use-package magit
-  :requires git-commit
+  ;; ;; My daily driver is 30, and 29 is just for testing packages in which case I
+  ;; ;; also want to revert to builtin transient 0.4.3
+  ;; :if (> emacs-major-version 29)
+  ;; :requires git-commit
   :defer
   :init
   ;; https://magit.vc/manual/magit/Performance.html
@@ -814,10 +838,7 @@
             ("C-x C-l" . global-map)
             ("C-c l" . org-journal-mode-map)
             ("C-c C-c")
-            ("C-c C-," . org-mode-map)))
-  :config
-  ;; (massmapper-mode)
-  )
+            ("C-c C-," . org-mode-map))))
 
 (use-package nameless
   :defer
@@ -831,13 +852,6 @@
 (use-package nov
   :mode ("\\.epub\\'" . nov-mode))
 
-(use-package dropped-olivetti :disabled
-  :ensure (:repo "https://github.com/meedstrom/dropped-olivetti")
-  :config
-  (setq dropped-olivetti-style 'fancy)
-  (setq-default dropped-olivetti-body-width 81)
-  (dropped-olivetti-mode))
-
 (use-package objed
   :commands objed-ipipe)
 
@@ -849,11 +863,12 @@
   ;; (after! org
   ;; (setq org-time-stamp-formats (cons "%Y-%m-%d" "%Y-%m-%d %a %H:%M")))
   (setq org-pretty-entities t)
-  (setq org-archive-location "/home/kept/roam/noagenda/archive.org::datetree/")
+  (setq org-archive-location "~/org/noagenda/archive.org::datetree/")
   (setq org-clock-persist t)
   (setq org-clock-auto-clock-resolution t)
-  (setq org-startup-folded 'nofold)
-  (setq citar-bibliography '("/home/kept/roam/refs/library_biblatex.bib"))
+  ;; I'd prefer `nofold', but the prop drawer shows org-node refs and backlinks
+  ;; (setq org-startup-folded 'nofold)
+  (setq citar-bibliography '("~/org/refs/library_biblatex.bib"))
   (setq org-archive-save-context-info '(time file itags olpath))
   (setq org-export-backends '(html latex odt texinfo))
   (setq org-export-with-toc nil)
@@ -882,8 +897,6 @@
   (setq org-replace-disputed-keys t)
   (setq org-tags-column 0)
   (setq org-startup-indented t)
-  (setq org-download-heading-lvl nil)
-  (setq org-download-image-dir "img/")
   (setq org-clock-kill-emacs-query nil) ;; fix bug
 
 
@@ -926,6 +939,27 @@
                    ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
                    ("\\paragraph{%s}" . "\\paragraph*{%s}")
                    ("\\subparagraph{%s}" . "\\subparagraph*{%s}"))))
+
+  ;;   ;; Allow tab to jump to links
+  ;;   (add-hook 'org-tab-after-check-for-table-hook #'me/org-next-link)
+  ;;   (setq org-cycle-include-plain-lists t)
+  ;;   (defun me/org-next-link (&optional arg)
+  ;;     "Right after jumping to a next link, make S-TAB available as a way to
+  ;; jump backwards, repeatable."
+  ;;     (interactive)
+  ;;     (unless (and org-cycle-include-plain-lists
+  ;;                  (not (thing-at-point 'url))
+  ;;                  (let ((item (org-element-lineage
+  ;;                               (org-element-at-point) '(item plain-list) t)))
+  ;;                    (and item (= (pos-bol) (org-element-post-affiliated item)))))
+  ;;       (let ((map (make-sparse-keymap))
+  ;;             (cmd (lambda () (interactive) (me/org-next-link t))))
+  ;;         (define-key map (kbd "<backtab>") cmd)
+  ;;         (define-key map (kbd "S-<iso-lefttab>") cmd)
+  ;;         (define-key map (kbd "C-S-i") cmd)
+  ;;         (org-next-link arg)
+  ;;         (set-transient-map map))))
+
   :config
   (unless after-init-time
     (setq debug-on-error t)
@@ -971,73 +1005,62 @@
   ;; (setopt org-agenda-tag-filter-preset '("-exclude"))
   )
 
-
-(use-package org-journal :disabled
-  :config
-  (add-hook 'org-journal-after-header-create-hook #'org-node-nodeify-entry)
-  (add-hook 'org-journal-mode-hook
-            (lambda ()
-              (setq outline-regexp (rx (or bos (seq (+ "*") " "))))))
-  (setq org-journal-dir "/home/kept/roam/daily")
-  (setq org-journal-file-format "%Y-%m-%d.org")
-  (setq org-journal-date-prefix "#+title: ")
-  (setq org-journal-date-format "%Y-%b-%d")
-  (setq org-journal-time-prefix "* ")
-  ;; (setq org-journal-time-format "")
-  )
-
-(use-package org-node-fakeroam
-  :ensure (:fetcher github :repo "meedstrom/org-node"
-                    :files ("org-node-fakeroam.el")
-                    :branch "main")
+(use-package org-daily-reflection
+  :ensure (:fetcher github :repo "emacsomancer/org-daily-reflection")
   :after org-node
-  :requires org-node)
+  :config (setq org-daily-reflection-dailies-directory
+                (org-node--guess-daily-dir))
+  (defun my-reflect ()
+    (interactive)
+    (delete-other-windows)
+    (my-last-daily-file)
+    (org-daily-reflection 'week 3)))
+
+(use-package org-download
+  :commands org-download-yank
+  :init
+  (setq org-download-heading-lvl nil)
+  (setq org-download-image-dir "img/"))
+
+;; https://github.com/progfolio/elpaca/issues/368
+(defun +elpaca/build-if-new (e)
+  (setf (elpaca<-build-steps e)
+        (if-let ((default-directory (elpaca<-build-dir e))
+                 (main (ignore-errors (elpaca--main-file e)))
+                 (compiled (expand-file-name (concat (file-name-base main) ".elc")))
+                 ((file-newer-than-file-p main compiled)))
+            (progn (elpaca--signal e "Rebuilding due to source changes")
+                   (cl-set-difference elpaca-build-steps
+                                      '(elpaca--clone elpaca--configure-remotes elpaca--checkout-ref)))
+          (elpaca--build-steps nil (file-exists-p (elpaca<-build-dir e))
+                               (file-exists-p (elpaca<-repo-dir e)))))
+  (elpaca--continue-build e))
+
+(setq debug-on-message "^File error:.*")
+
+(use-package el-job
+  :ensure ( :build (+elpaca/build-if-new)
+            :repo "https://github.com/meedstrom/el-job"
+            :inherit nil))
 
 (use-package org-node
-  :ensure (:fetcher github :repo "meedstrom/org-node"
-                    :files (:defaults (:exclude "org-node-fakeroam.el"))
-                    :branch "main")
+  :ensure ( :build (+elpaca/build-if-new))
   :after org
   :config
-  ;; (add-hook 'org-mode-hook #'org-node-backlink-mode)
-  (setq org-roam-directory "/home/kept/roam/")
-  (setq org-node-extra-id-dirs '("/home/kept/roam/" "/home/me/.doom.d/"))
-  (setq org-node-renames-allowed-dirs '("/home/kept/roam/"))
-  (add-hook 'after-save-hook 'org-node-rename-file-by-title)
-  (setq org-read-date-prefer-future nil)
-  (setq org-node-series-defs
-        (list
-         (org-node-mk-series-on-tag-by-property
-          "w" "My public notes (visible on the web)" "pub" "CREATED")
-         '("d" :name "Daily-files"
-           :version 2
-           :classifier (lambda (node)
-                         (let ((path (org-node-get-file-path node)))
-                           (when (string-search (org-node--guess-daily-dir) path)
-                             (let ((ymd (org-node-helper-filename->ymd path)))
-                               (when ymd
-                                 (cons ymd path))))))
-           :whereami (lambda ()
-                       (org-node-helper-filename->ymd buffer-file-name))
-           :prompter (lambda (key)
-                       ;; Tip: Consider `org-read-date-prefer-future' nil
-                       (let ((org-node-series-that-marks-calendar key))
-                         (org-read-date)))
-           :try-goto (lambda (item)
-                       (org-node-helper-try-visit-file (cdr item)))
-           :creator (lambda (sortstr key)
-                      (let ((org-node-datestamp-format "")
-                            (org-node-slug-fn (lambda (&rest _) sortstr))
-                            (org-node-ask-directory (org-node--guess-daily-dir)))
-                        (org-node-create (format-time-string
-                                          "%Y-%b-%d"
-                                          (org-time-string-to-time sortstr))
-                                         (org-id-new)
-                                         key))))))
+  (setq org-node-extra-id-dirs '("~/org/" "~/emacs"))
+  (add-to-list 'org-node-extra-id-dirs-exclude "/elpaca/")
 
+  (org-node-cache-mode)
+  (org-node-backlink-mode)
+  (org-node-complete-at-point-mode)
+  (add-hook 'after-save-hook 'org-node-rename-file-by-title)
+
+  (setq org-node-backlink-aggressive t)
+  (setq org-node-renames-allowed-dirs '("~/org/"))
+  (setq org-read-date-prefer-future nil)
   ;; (setq org-node--debug nil)
   ;; (setopt org-node-perf-eagerly-update-link-tables t)
-  ;; (setopt org-node-perf-assume-coding-system 'utf-8-auto-unix)
+  (setopt org-node-perf-assume-coding-system 'utf-8-unix)
   ;; (setopt org-node-ask-directory "/home/kept/roam")
   ;; (setopt org-node-prefer-with-heading t)
   ;; (setopt org-node-slug-fn #'org-node-slugify-like-roam-default)
@@ -1046,28 +1069,57 @@
   ;; (setopt org-node-datestamp-format "")
   ;; (setopt org-node-slug-fn #'org-node-slugify-for-web)
   ;; (setq org-node-creation-fn #'org-capture)
-  ;; (setopt org-node-creation-fn #'org-node-new-via-roam-capture)
-  (setopt org-node-creation-fn #'org-node-new-file)
+  ;; (setopt org-node-creation-fn #'org-node-new-file)
   ;; (setopt org-node-alter-candidates t)
+
+  (after! org-roam-id
+    ;; Restore default
+    (org-link-set-parameters
+     "id" :follow #'org-id-open :store #'org-id-store-link-maybe))
   (setq org-node-filter-fn
         (lambda (node)
           (not
            (or (string-search "archive/" (org-node-get-file-path node))
                (string-search "noagenda/" (org-node-get-file-path node))))))
 
-  (add-hook 'org-roam-mode-hook #'visual-line-mode)
+  (setq org-node-series-defs
+        (list
+         ;;(org-node-mk-series-on-tags-sorted-by-property
+         ;; "w" "My public notes (visible on the web)" "pub" "CREATED")
+         (org-node-mk-series-on-filepath-sorted-by-basename
+          "d" "Dailies" "~/org/daily/" nil t)
+         ))
 
-  ;; TODO Do a hard-rewrap and cache that output? This is hella slow.
-  ;; (add-hook 'org-roam-mode-hook #'org-indent-mode)
+  ;; (setq org-node-series-defs
+  ;;       (list
+  ;;        ;;(org-node-mk-series-on-tags-sorted-by-property
+  ;;        ;; "w" "My public notes (visible on the web)" "pub" "CREATED")
 
-  (org-node-cache-mode)
-  (org-node-backlink-global-mode)
-  (org-node-fakeroam-jit-backlinks-mode)
-  (org-node-fakeroam-redisplay-mode)
-  (org-node-fakeroam-fast-render-mode)
-
-  (org-node-complete-at-point-mode)
-  ;; (org-node-fakeroam-db-feed-mode)
+  ;;        '("d" :name "Daily-files"
+  ;;          :version 2
+  ;;          :classifier (lambda (node)
+  ;;                        (let ((path (org-node-get-file-path node)))
+  ;;                          (when (string-prefix-p "/home/kept/roam/daily/" path)
+  ;;                            (let ((ymd (org-node-helper-filename->ymd path)))
+  ;;                              (when ymd
+  ;;                                (cons ymd path))))))
+  ;;          :whereami (lambda ()
+  ;;                      (org-node-helper-filename->ymd buffer-file-name))
+  ;;          :prompter (lambda (key)
+  ;;                      ;; Tip: Consider `org-read-date-prefer-future' nil
+  ;;                      (let ((org-node-series-that-marks-calendar key))
+  ;;                        (org-read-date)))
+  ;;          :try-goto (lambda (item)
+  ;;                      (org-node-helper-try-visit-file (cdr item)))
+  ;;          :creator (lambda (sortstr key)
+  ;;                     (let ((org-node-datestamp-format "")
+  ;;                           (org-node-slug-fn (lambda (&rest _) sortstr))
+  ;;                           (org-node-ask-directory "/home/kept/roam/daily/"))
+  ;;                       (org-node-create (format-time-string
+  ;;                                         "%Y-%b-%d"
+  ;;                                         (org-time-string-to-time sortstr))
+  ;;                                        (org-id-new)
+  ;;                                        key))))))
 
   ;; Make sure the extracted subtree inherits any CREATED property,
   ;; else creates one for today
@@ -1079,7 +1131,32 @@
                   (org-entry-put nil "CREATED"
                                  (or parent-creation
                                      (format-time-string
-                                      (org-time-stamp-format nil t))))))))
+                                      (org-time-stamp-format t t))))))))
+
+(use-package org-node-fakeroam
+  :ensure (:build (+elpaca/build-if-new))
+  :after org-node
+  :config
+  (setq org-node-fakeroam-persist-previews t)
+  (add-hook 'org-roam-mode-hook #'visual-line-mode)
+  (org-node-fakeroam-jit-backlinks-mode)
+  (org-node-fakeroam-db-feed-mode)
+  (org-node-fakeroam-redisplay-mode)
+  (org-node-fakeroam-fast-render-mode)
+  (add-hook 'org-open-at-point-functions
+            #'org-node-try-visit-ref-node)
+  ;; Good in eliezers-sequences.org
+  (add-to-list 'org-roam-buffer-postrender-functions
+               #'magit-section-show-level-2)
+
+  ;; TODO Do a hard-rewrap and cache that output? This is hella slow.
+  ;; (add-hook 'org-roam-mode-hook #'org-indent-mode)
+
+  (add-hook 'me/load-theme-hook
+            (defun me/theme-mod-roam ()
+              (set-face-attribute 'org-roam-title nil :height 1.5)))
+  (when after-init-time
+    (me/theme-mod-roam)))
 
 (use-package org-noter :disabled
   :init
@@ -1093,8 +1170,7 @@
   (setq org-roam-file-exclude-regexp '("logseq/bak/" "logseq/version-files/"))
   (setq org-roam-link-auto-replace nil)
   (setq org-roam-db-update-on-save nil)
-  (setq org-roam-directory "/home/kept/roam/")
-  (setq org-roam-dailies-directory "daily/")
+  (setq org-roam-directory "~/org/")
   (setq org-roam-ui-browser-function #'my-browse-url-chromium-kiosk)
   (setq org-roam-dailies-capture-templates
         `(("d" "default" entry "* %<%H:%M>\n%?" :if-new
@@ -1103,22 +1179,17 @@
                                       "#+filetags: :daily:")
                                     "\n"))
            :immediate-finish t
-           :jump-to-captured t)))
-
+           :jump-to-captured t)
+          ("t" "test alternative" entry "* %<%H:%M> Alt\n%?" :if-new
+           (file+head "%<%Y-%m-%d>.org"
+                      ,(string-join '("#+title: %<%Y-%b-%d>"
+                                      "#+filetags: :daily:")
+                                    "\n")))))
   :config
-  (add-hook 'me/load-theme-hook
-            (defun my-theme-mod-roam ()
-              ;; For backlinks buffer
-              (set-face-attribute 'org-roam-title nil :height 1.5)))
-  ;; When I have a fresh thought, avoid distraction by any earlier stuff I
-  ;; wrote (ADHD)
-  (after! org-roam-dailies
-    (advice-add 'org-roam-dailies-capture-today :after
-                (defun my-recenter-top (&rest args)
-                  (recenter 0)
-                  args))))
+  )
 
 (use-package org-transclusion
+  :ensure (:repo "https://github.com/meedstrom/org-transclusion")
   :defer
   :config
   (set-face-background 'org-transclusion "#222")
@@ -1179,7 +1250,7 @@
 
   ;; Still haven't really used these
   (keymap-set global-map "C-M-a" #'sp-backward-down-sexp)
-  (keymap-set smartparens-mode-map "C-k" #'mstrom/sp-kill-hybrid-sexp)
+  (keymap-set smartparens-mode-map "C-k" #'me/sp-kill-hybrid-sexp)
   (keymap-set global-map "C-M-e" #'sp-up-sexp)
   (keymap-set global-map "C-M-u" #'sp-backward-up-sexp)
   (keymap-set global-map "C-'" #'sp-mark-sexp)
@@ -1210,9 +1281,32 @@
   ;; (keymap-set global-map "C-2 s" #'sp-select-previous-thing)
   )
 
-(use-package svelte-mode)
+(use-package svelte-mode
+  :defer)
 
 ;; (use-package transient)
+
+(use-package treesit-auto
+  :init
+  (setq treesit-language-source-alist
+        '((svelte "https://github.com/Himujjal/tree-sitter-svelte")))
+  (setq treesit-auto-install 'prompt)
+  :config
+  ;; (cl-pushnew 'svelte treesit-auto-langs)
+  ;; (push (make-treesit-auto-recipe
+  ;;        :lang 'svelte
+  ;;        :ts-mode 'svelte-ts-mode
+  ;;        :remap 'svelte-mode
+  ;;        :url "https://github.com/Himujjal/tree-sitter-svelte"
+  ;;        :ext "\\.svelte\\'")
+  ;;       treesit-auto-recipe-list)
+  (setq treesit-auto-langs '( typescript tsx html json css javascript
+                              toml yaml
+                              python r
+                              ))
+  (treesit-auto-install-all)
+  (treesit-auto-add-to-auto-mode-alist)
+  (global-treesit-auto-mode))
 
 (use-package orderless
   :config
@@ -1304,6 +1398,7 @@
 
 ;;; Font
 
+;; (set-face-font 'default (font-spec :family "Iosevka Nerd Font" :size 30))
 (set-face-font 'default (font-spec :family "Iosevka Nerd Font" :size 33))
 ;; (progn
 ;;   (set-face-font 'default (font-spec :family "Iosevka Nerd Font" :size 66))
@@ -1327,14 +1422,16 @@
 
 
 ;;; Debugging
-;; To uncomment as needed
 
-;; (add-to-list 'interrupt-process-functions #'me/log-process-name)
-;; (setq-default debug-on-signal 'quit debug-on-quit t)
-;; (setq debug-on-signal t)
-;; (delq 'user-error debug-ignored-errors) ;; Also enter debugger for `user-error'
-;; (setq backtrace-on-redisplay-error nil)
-;; (debug-watch 'org-mode)
+(defun me/enable-extra-debug ()
+  (interactive)
+  ;; (add-to-list 'interrupt-process-functions #'me/log-process-name)
+  ;; (setq-default debug-on-signal 'quit debug-on-quit t)
+  ;; (setq debug-on-signal t)
+  ;; (setq backtrace-on-redisplay-error nil)
+  ;; (debug-watch 'org-mode)
+  (delq 'user-error debug-ignored-errors) ;; Also enter debugger for `user-error'
+  )
 
 
 ;;;; Builtin
@@ -1370,7 +1467,8 @@
 
 ;; Perf (especially Org)
 (global-auto-composition-mode 0)
-(setq bidi-display-reordering nil)
+(setq-default bidi-display-reordering nil)
+(setq-default bidi-inhibit-bpa t)
 
 ;; Catch mistakes in my elisp on save
 ;; (add-hook 'after-save-hook #'my-compile-and-drop)
@@ -1387,7 +1485,7 @@
 ;; Good values:
 ;; 2^12 on Latitude E7250.
 ;; 2^10 on Thinkpad X200.
-(setq comint-buffer-maximum-size (^ 2 10))
+(setq comint-buffer-maximum-size (expt 2 10))
 (add-hook 'comint-output-filter-functions
           #'my-truncate-buffer-and-move-excess)
 
@@ -1396,6 +1494,7 @@
                                       mark-ring global-mark-ring
                                       search-ring regexp-search-ring))
 
+(setq emacs-lisp-docstring-fill-column 72) ;; Emacs 30 bumped default from 65
 (setq mode-line-percent-position nil)
 (setq mode-line-modes nil)
 (setq undo-limit (* 4 1000 1000)) ;; 4 MB (default 160 kB)
@@ -1413,8 +1512,10 @@
 (setq save-interprogram-paste-before-kill t)
 (setq select-enable-primary t)
 (setq enable-local-variables :all)
+(setq warning-display-at-bottom nil)
 (setq custom-safe-themes t)
 (setq message-log-max 8000)
+;; (setq warning-minimum-log-level :debug)
 (setq disabled-command-function nil) ;; bug: clutters init.el, not custom.el
 (setq kill-read-only-ok t)
 (setq kill-ring-max 600)
@@ -1614,15 +1715,6 @@
 (keymap-set global-map "<f2> m" #'my-last-daily-file)
 (keymap-set global-map "<f2> z" #'my-sleep)
 (keymap-set global-map "<f3> f d" #'me/delete-this-file)
-
-(defun me/delete-this-file ()
-  (interactive)
-  (let ((filename (buffer-file-name)))
-    (when (y-or-n-p (format "Are you sure you want to delete %s? " filename))
-      (delete-file filename delete-by-moving-to-trash)
-      (message "Deleted file %s" filename)
-      (kill-buffer))))
-
 (keymap-set global-map "<f3> q q" #'save-buffers-kill-emacs)
 (keymap-set global-map "<f5>" #'repeat)
 (keymap-set global-map "C-0" #'hippie-expand)
@@ -1630,7 +1722,7 @@
 (keymap-set global-map "C-2" #'other-window)
 (keymap-set global-map "C-3" #'unexpand-abbrev)
 (keymap-set global-map "C-4" #'my-stim)
-(keymap-set global-map "M-o m" #'org-node-fakeroam-show-roam-buffer)
+(keymap-set global-map "M-o m" #'org-node-fakeroam-show-buffer)
 (keymap-set global-map "C-5" #'my-prev-file-in-dir)
 (keymap-set global-map "C-6" #'my-next-file-in-dir)
 (keymap-set global-map "C-8" #'kill-whole-line)
@@ -1638,7 +1730,7 @@
 (keymap-set global-map "C-<next>" #'iflipb-next-buffer)
 (keymap-set global-map "C-<prior>" #'iflipb-previous-buffer)
 (keymap-set global-map "C-M-/" #'dabbrev-expand)
-(keymap-set global-map "C-h C-h" #'my-describe-last-key)
+(keymap-set global-map "C-h h" #'my-describe-last-key)
 (keymap-set global-map "C-h M" #'describe-mode)
 (keymap-set global-map "C-h P" #'finder-by-keyword) ;; original C-h p
 (keymap-set global-map "C-h m" #'consult-minor-mode-menu)
@@ -1694,6 +1786,7 @@
 (keymap-set global-map "M-g t" #'avy-goto-char-timer)
 (keymap-set global-map "M-g z" #'avy-goto-word-or-subword-1)
 (keymap-set global-map "M-m g" (defrepeater #'pop-global-mark)) ;; was C-x C-SPC
+(keymap-set global-map "M-m c" #'mc/mark-pop)
 (keymap-set global-map "M-m m" #'set-mark-command) ;; was C-SPC
 (keymap-set global-map "M-m p" (defrepeater #'pop-to-mark-command))
 (keymap-set global-map "M-m r" #'rectangle-mark-mode) ;; was C-x SPC
@@ -1714,14 +1807,9 @@
 (keymap-set global-map "M-o b" #'backup-walker-start)
 (keymap-set global-map "M-o c" #'org-capture)
 (keymap-set global-map "M-o d" #'my-insert-today)
-(keymap-set global-map "M-o t"
-            (defun my-goto-today ()
-              (interactive)
-              (org-node-series-goto "d" (format-time-string "%F"))
-              (goto-char (point-max))
-              (org-insert-heading)
-              (insert (format-time-string "%H:%M"))))
+(keymap-set global-map "M-o t" #'me/goto-today)
 (keymap-set global-map "M-o f" #'org-node-find)
+(keymap-set global-map "M-o g" #'org-node-grep)
 (keymap-set global-map "M-o h" #'consult-find)
 (keymap-set global-map "M-o i" #'org-node-insert-link)
 (keymap-set global-map "M-o n" #'org-node-nodeify-entry)
@@ -1984,13 +2072,13 @@
 (after! org (setopt org-todo-keywords '((sequence "IDEA" "DONE"))))
 (setq org-agenda-files
       (seq-filter #'file-exists-p
-                  '("/home/kept/roam/daily-review.org"
-                    "/home/kept/roam/outcomes.org"
-                    "/home/kept/roam/ideas.org")))
+                  '("~/org/daily-review.org"
+                    "~/org/outcomes.org"
+                    "~/org/ideas.org")))
 
 (setq org-capture-templates
       '(("o" "Outcome"
-         entry (file "/home/kept/roam/outcomes.org")
+         entry (file "~/org/outcomes.org")
          "* %?"
          :prepend t
          :hook ( org-node-put-created
@@ -2011,21 +2099,21 @@
          :prepare-finalize my-put-currency)
 
         ("t" "Thread"
-         entry (file+headline "/home/kept/roam/daily-review.org" "Threads")
+         entry (file+headline "~/org/daily-review.org" "Threads")
          "* THREAD %?"
          :prepend t
          :hook ( my-turn-into-org-habit
                  org-node-put-created ))
 
         ("r" "Reviewable"
-         entry (file+headline "/home/kept/roam/daily-review.org" "Reviewables")
+         entry (file+headline "~/org/daily-review.org" "Reviewables")
          "* IDEA %?"
          :prepend t
          :hook ( my-turn-into-org-habit
                  org-node-put-created ))
 
         ("i" "Idea"
-         entry (file+headline "/home/kept/roam/ideas.org" "Unsorted")
+         entry (file+headline "~/org/ideas.org" "Unsorted")
          "* IDEA %?"
          :prepend t
          )
@@ -2114,8 +2202,16 @@
             (recover-file buffer-file-name)
           (setq mutually-recursed-once nil))))))
 
+
+;; wait, you mean to tell me that nromally when a loop visits many files to
+;; edit them, find-file-noselect just emits polite warnings that the user won't
+;; notice (on account of the loop), so the loop will go ahead unhindered???
+
+;; ive been protected by the above advice, i didnt know the default will be so
+;; gung ho
+
 
-;;; Progressively preload packages in the background
+;;; Gradually preload packages in the background
 
 (add-hook 'elpaca-after-init-hook
           (defun me/progressive-preload ()
@@ -2155,6 +2251,22 @@
 
 ;;;; Experiment zone
 
+(add-hook 'before-save-hook
+          (defun me/make-parent-directory ()
+            (mkdir (file-name-directory buffer-file-name) t)))
+;; ;; Doom does the above at find-file time:
+;; (add-hook! 'find-file-not-found-functions
+;;   (defun doom-create-missing-directories-h ()
+;;     "Automatically create missing directories when creating new files."
+;;     (unless (file-remote-p buffer-file-name)
+;;       (let ((parent-directory (file-name-directory buffer-file-name)))
+;;         (and (not (file-directory-p parent-directory))
+;;              (y-or-n-p (format "Directory `%s' does not exist! Create it?"
+;;                                parent-directory))
+;;              (progn (make-directory parent-directory 'parents)
+;;                     t))))))
+
+
 (setopt helpful-max-buffers nil) ;; what's the point of killing buffers
 (setopt ranger-map-style 'emacs)
 (setopt which-key-idle-delay 0.2)
@@ -2190,7 +2302,11 @@
 
 (defun my-publish ()
   (interactive)
-  (load (concat user-emacs-directory "lib-publish-blog"))
+  (let* ((el (concat user-emacs-directory "lib-publish-blog.el"))
+         (eln (comp-el-to-eln-filename el)))
+    (unless (file-newer-than-file-p eln el)
+      (native-compile el))
+    (load eln))
   (call-interactively #'my-publish-begin))
 
 ;; When closing and reopening Emacs often (esp with 2+ simultaneous instances),
@@ -2217,6 +2333,69 @@
 (use-package anaconda-mode)
 (add-to-list 'major-mode-remap-alist '(python-mode . python-ts-mode))
 
+
+(setq initial-buffer-choice #'recentf-open-files)
+
+;; (elpaca (nano :fetcher github :repo "rougier/nano-emacs")
+
+;;   ;; Theme
+;;   (require 'nano-faces)
+;;   (require 'nano-theme)
+;;   (require 'nano-theme-dark)
+;;   (require 'nano-theme-light)
+
+;;   (cond
+;;    ((member "-default" command-line-args) t)
+;;    ((member "-dark" command-line-args) (nano-theme-set-dark))
+;;    (t (nano-theme-set-light)))
+;;   (call-interactively 'nano-refresh-theme)
+
+;;   ;; Nano default settings (optional)
+;;   (require 'nano-defaults)
+
+;;   ;; Nano session saving (optional)
+;;   ;; (require 'nano-session)
+
+;;   ;; Nano header & mode lines (optional)
+;;   (require 'nano-modeline))
+
+;; ;; Nano key bindings modification (optional)
+;; ;; (require 'nano-bindings)
+
+;; ;; Compact layout (need to be loaded after nano-modeline)
+;; ;; (require 'nano-compact)
+
+;;; from https://github.com/jamescherti/minimal-emacs.d
+
+;; Disable the warning "X and Y are the same file". Ignoring this warning is
+;; acceptable since it will redirect you to the existing buffer regardless.
+(setq find-file-suppress-same-file-warnings t)
+
+;; Resizing the Emacs frame can be costly when changing the font. Disable this
+;; to improve startup times with fonts larger than the system default.
+(setq frame-resize-pixelwise t)
+
+;; However, do not resize windows pixelwise, as this can cause crashes in some
+;; cases when resizing too many windows at once or rapidly.
+(setq window-resize-pixelwise nil)
+
+;; Move point to top/bottom of buffer before signaling a scrolling error.
+(setq scroll-error-top-bottom t)
+
+;; Keeps screen position if the scroll command moved it vertically out of the
+;; window.
+(setq scroll-preserve-screen-position t)
+
+;; Continue wrapped lines at whitespace rather than breaking in the
+;; middle of a word.
+(setq-default word-wrap t)
+
+;; Disable wrapping by default due to its performance cost.
+(setq-default truncate-lines t)
+
+;; ...
+;; it loaded my "wip.el" file that has no autoloads nor provides
+(setq help-enable-completion-autoload nil)
 
 ;; Local Variables:
 ;; no-byte-compile: t

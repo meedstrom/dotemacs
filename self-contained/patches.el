@@ -57,3 +57,4 @@ If XML, generate XML instead of HTML."
               (insert "\n"))
 	    (insert (make-string column ?\s)))
           (insert (format "</%s>" (dom-tag dom))))))))
+

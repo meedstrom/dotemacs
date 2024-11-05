@@ -23,6 +23,144 @@
   (require 'dash)
   (require 'crux))
 
+;; See excellent research at https://github.com/org-roam/org-roam/pull/1460.
+;; TL:DR: don't strip ALL nonspacing marks, not even the 0300-036F range.
+
+;; Stripping is the norm for users of a Latin-based alphabet because:
+;; 1. filenames and web URLs stay comprehensible anyway
+;; 2. there are pragmatic benefits when any QWERTY keyboard can type it
+
+;; For other languages, it makes much less sense:
+;; 1. in a language like Japanese, stripping these marks actually alters
+;;    semantics to an uncomfortable extent
+;; 2. you still aren't gonna be able to type the title on a QWERTY keyboard
+(defvar me/latin-diacritics
+  '( #x300 #x301 #x302 #x303 #x304 #x306 #x307
+     #x308 #x309 #x30A #x30B #x30C #x31B #x323
+     #x324 #x325 #x327 #x32D #x32E #x330 #x331)
+  "Unicode codepoints for some combining accents.
+They correspond to such glyphs as `, ´, ¨, often used with Latin-based
+alphabets.")
+
+(defun me/strip-diacritics (input-string)
+  "Requires Emacs 29."
+  (thread-last input-string
+               (string-glyph-decompose)
+               ;; https://www.unicode.org/charts/PDF/U0300.pdf
+               (seq-remove (##memq % me/latin-diacritics))
+               (concat)
+               (string-glyph-compose)))
+
+(defun me/write-eldata (file object)
+  "Write text representation of Lisp OBJECT into FILE.
+Overwrites what was in that file.
+
+Kill any buffer that may have been visiting FILE, to prevent an error
+signal from a bug in `userlock--ask-user-about-supersession-threat'
+that presumes in some cases that the current buffer is visiting FILE."
+  ;; There is the broader `find-buffer-visiting', but `get-truename-buffer'
+  ;; appears to be what's used in filelock.c. (in 30)
+  ;; TODO: Clone blobless emacs repo and check what 28/29 filelock.c use.
+  (when-let ((buf (if (>= emacs-major-version 30)
+                      (get-truename-buffer file)
+                    (get-file-buffer file))))
+    (kill-buffer buf))
+  (write-region (prin1-to-string object nil '((length . nil) (level . nil)))
+                nil file nil 'quiet))
+
+(defun me/read-eldata (file)
+  (with-temp-buffer
+    (insert-file-contents file)
+    (read (buffer-string))))
+
+(defun me/delete-eldata (file)
+  "Delete FILE, killing its buffer if it has one.
+See `me/write-eldata' for reason to kill the buffer.
+
+Also use the unadvised `delete-file', since it can be bogged
+down by slow advices."
+  (cl-assert (file-name-absolute-p file))
+  (let ((real-delete (org-node--fn-sans-advice #'delete-file))
+        (buf (if (>= emacs-major-version 30)
+                 (get-truename-buffer file)
+               (get-file-buffer file))))
+    (and buf (kill-buffer buf))
+    ;; REVIEW: Would it be sane to use Emacs 30 `delete-file-internal'?
+    (funcall real-delete file)))
+
+(defun me/fn-sans-advice (sym)
+  "Get original function defined at SYM, sans advices."
+  (if (advice--p (symbol-function sym))
+      (advice--cd*r (symbol-function sym))
+    (if (fboundp 'ad-get-orig-definition)
+        (ad-get-orig-definition sym)
+      sym)))
+
+(defun me/file-of-provide (feature)
+  "Find file where there is `provide' for FEATURE."
+  (cl-loop for (file . elems) in load-history
+           when (eq (cdr (assq 'provide elems)) feature)
+           return file))
+
+;; Upstreamable IMO
+(defun me/hexa-to-decimal (hexadecimal-string &optional interactive)
+  (interactive "s\np")
+  (if interactive
+      (print (string-to-number hexadecimal-string 16))
+    (string-to-number hexadecimal-string 16)))
+
+(defun me/decimal-to-hexa (number &optional interactive)
+  (interactive "n\np")
+  (if interactive
+      (print (format "%X" number))
+    (format "%X" number)))
+
+(defun me/profile-expr ()
+  (interactive)
+  (require 'profiler)
+  (let* ((func-atpt (thing-at-point 'defun))
+         (expr (read--expression
+                "Eval and profile this expression: "
+                (when func-atpt
+                  (symbol-name (cadar (read-from-string func-atpt)))))))
+
+    (profiler-start 'cpu+mem)
+    (eval expr)
+    (profiler-stop)
+    (profiler-report)))
+
+(defun me/edebug-expr ()
+  (interactive)
+  (if-let* ((func-atpt (thing-at-point 'defun))
+            (func (cadar (read-from-string func-atpt)))
+            (name (symbol-name func)))
+      (progn
+        (eval `(my-hook-once 'eval-expression-minibuffer-setup-hook
+                 (insert "(" ,name ")")))
+        (edebug-defun)
+        (unwind-protect (call-interactively #'eval-expression)
+          (edebug-remove-instrumentation (list func))))
+    (message "no defun at point")
+    ;; (edebug-defun)
+    ;; (call-interactively #'eval-expression)
+    ))
+
+(defun me/delete-this-file ()
+  (interactive)
+  (let ((filename (buffer-file-name)))
+    (when (y-or-n-p (format "Are you sure you want to delete %s? " filename))
+      (delete-file filename delete-by-moving-to-trash)
+      (message "Deleted file %s" filename)
+      (kill-buffer))))
+
+(defun me/goto-today ()
+  (interactive)
+  (org-node-series-goto "d" (format-time-string "%F"))
+  (goto-char (point-max))
+  (unless (= (point) (pos-bol))
+    (newline))
+  (insert "* " (format-time-string "%H:%M")))
+
 (defun me/persist-state--maybe-sync-org-id-locations ()
   "Combine `org-id-locations-load' and `org-id-locations-save'.
 This permits usage from multiple running instances of Emacs."
@@ -89,7 +227,7 @@ This permits usage from multiple running instances of Emacs."
       (remove-hook hook fn t)
       (message "Removed buffer-local hook: %s" fn))))
 
-(defun mstrom/sp-kill-hybrid-sexp (arg)
+(defun me/sp-kill-hybrid-sexp (arg)
   "Use `sp-kill-hybrid-sexp' unless the line is long.
 It hangs on long lines, so fall back on `kill-line'."
   (interactive "P")
@@ -101,10 +239,11 @@ It hangs on long lines, so fall back on `kill-line'."
   "Completely wipe org-id-locations."
   (interactive)
   (require 'eww)
-  (rename-file org-id-locations-file
-               (eww-make-unique-file-name
-                (file-name-nondirectory org-id-locations-file)
-                (file-name-directory org-id-locations-file)))
+  (when (file-exists-p org-id-locations-file)
+    (rename-file org-id-locations-file
+                 (eww-make-unique-file-name
+                  (file-name-nondirectory org-id-locations-file)
+                  (file-name-directory org-id-locations-file))))
   (setq org-id-locations nil)
   (setq org-id--locations-checksum nil)
   (setq org-agenda-text-search-extra-files nil)
@@ -265,7 +404,9 @@ KEYWORDS can be any of :name, :files, :depth, :branch.
       (progn 
 	(profiler-stop)
 	(profiler-report))
-    (profiler-start 'cpu)))
+    (profiler-start (if (equal '(4) current-prefix-arg)
+                        'cpu+mem
+                      'cpu))))
 
 (defun me/handle-initialism-first-pattern (pattern index total)
   "Treat the first pattern as possibly an initialism.
@@ -521,6 +662,7 @@ so the result is always that long or longer."
 ;;       (seq-find #'lintorg--num-and-positive-p (parse-time-string str))
 ;;     (error "Expected time string, but got not even a string: %s" str)))
 
+;; See also `natnump'
 (defun my-positive-number-p (num?)
   (and (numberp num?)
        (> num? 0)))
@@ -897,12 +1039,12 @@ It gets a DEPTH of 95, see `add-hook'."
 (defun my-stim-collection-generate ()
   (let ((documented-commands nil)
         (roam-files
-         (append (directory-files "/home/kept/roam/" t ".org$")
-                 ;; (directory-files "/home/kept/roam/bloggable/" t ".org$")
-                 (directory-files "/home/kept/roam/frozen/" t ".org$")
-                 ;; (directory-files "/home/kept/roam/martin/pages/" t ".org$")
-                 (directory-files "/home/kept/roam/grismartin/pages/" t ".org$")
-                 (directory-files "/home/kept/roam/daily/" t ".org$"))))
+         (append (directory-files "~/org/" t ".org$")
+                 ;; (directory-files "~/org/bloggable/" t ".org$")
+                 (directory-files "~/org/frozen/" t ".org$")
+                 ;; (directory-files "~/org/martin/pages/" t ".org$")
+                 (directory-files "~/org/grismartin/pages/" t ".org$")
+                 (directory-files "~/org/daily/" t ".org$"))))
     (mapatoms
      (lambda (sym)
        (when (and (commandp sym)
@@ -1640,6 +1782,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 "))
     (comment-region beg (point))))
 
+;; Emacs 30 has `toggle-window-dedicated'
 (defun my-toggle-dedicate-window ()
   (interactive)
   (set-window-dedicated-p (selected-window)
@@ -2070,10 +2213,9 @@ function to `aggressive-indent-mode-hook'."
 (defun my-insert-today ()
   "Insert today's date."
   (interactive)
-  (let ((today (format-time-string "%Y-%m-%d")))
-    (if (derived-mode-p 'org-mode)
-        (insert (concat "[" today "]"))
-      (insert today))))
+  (if (derived-mode-p 'org-mode)
+      (insert (format-time-string (org-time-stamp-format t t)))
+    (insert (format-time-string "%Y-%m-%d"))))
 
 ;; Much better tty colors. Explanation: Bold black text in Emacs translates to
 ;; "brightblack" in the tty, which is... dark grey. Note that the background
@@ -2564,7 +2706,7 @@ For use in heavy loops; it skips activating `org-mode'.
 For all other uses, see `org-id-get'."
   (let ((file-name-handler-alist nil))
     (with-temp-buffer
-      (insert-file-contents-literally file nil 0 200)
+      (insert-file-contents-literally file nil 0 500)
       (when (search-forward ":id: " nil t)
         (when (= (line-number-at-pos) (line-number-at-pos (point-max)))
           (error "Whoops, amend `my-org-file-id'"))
@@ -2855,7 +2997,6 @@ matches PAGE-ID anyway (i.e. it's a file-level id)"
 
 ;;;; Unprefixed
 
-;; upstream soemthing like this?
 (defmacro time (&rest body)
   "Evaluate BODY and print time elapsed as a message.
 Then return the last value of BODY."
@@ -2865,7 +3006,8 @@ Then return the last value of BODY."
          (message "Elapsed: %fs" (float-time (time-since ,T)))))))
 
 (defmacro me/measure-time (&rest body)
-  "Evaluate BODY and return time elapsed."
+  "Evaluate BODY and return time elapsed.
+Note that there is also `benchmark-run'."
   (let ((T (cl-gensym)))
     `(let ((,T (current-time)))
        ,@body
@@ -2881,7 +3023,9 @@ indentation.
        \"baz\")"
   (string-join strings "\n"))
 
-;; Preserved because it was a Lisp lesson to me
+;; Preserved because it was a Lisp lesson to me.
+;; Many years after, I found the builtin `expt'.  Too undiscoverable...
+;; Upstream this alias?
 (defun ^ (x power)
   (apply #'* (make-list power x)))
 
