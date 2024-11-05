@@ -85,13 +85,6 @@
     doom-solarized-dark-high-contrast
     doom-rouge))
 
-;; Bonus.  Switch themes WITHOUT closing minibuffer (like Helm)!  Here's how.
-;; If C-; is bound to embark-act, type M-x me/load-theme.  Then when selecting
-;; a theme, don't type RET!  Type C-; C-m instead.
-(setq embark-quit-after-action
-      '((me/load-theme . nil)
-        (t . t)))
-
 ;;; Hooks
 
 (defun me/prism-desaturate-maybe ()
@@ -154,7 +147,9 @@ selections are taken from `me/okay-themes-day' in the day and
   (run-hooks 'me/load-theme-hook))
 
 
-
-;; Bonus snippet!  When interactively selecting a theme with `me/load-theme',
-;; then (assuming C-l is `embark-act') typing C-; C-m will load the theme at
-;; point without exiting the minibuffer, so you can just go try another theme.
+;; Bonus.  Switch themes WITHOUT closing minibuffer (like Helm)!  Here's how.
+;; If C-; is bound to embark-act, type M-x me/load-theme.  Then when selecting
+;; a theme, don't type RET!  Type C-; C-m instead.
+(setq embark-quit-after-action
+      '((me/load-theme . nil)
+        (t . t)))
