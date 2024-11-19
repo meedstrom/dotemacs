@@ -1,11 +1,12 @@
 ;; -*- lexical-binding: t; -*-
 
 ;;; Init Elpaca, a package manager (using snippet from their README)
-(defvar elpaca-installer-version 0.7)
+(defvar elpaca-installer-version 0.8)
 (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
 ;; CUSTOM
 (defvar elpaca-builds-directory
   (expand-file-name (concat "builds" emacs-version "/") elpaca-directory))
+(defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
 (defvar elpaca-repos-directory (expand-file-name "repos/" elpaca-directory))
 (defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
                               :ref nil :depth 1
@@ -18,19 +19,20 @@
   (add-to-list 'load-path (if (file-exists-p build) build repo))
   (unless (file-exists-p repo)
     (make-directory repo t)
+    (when (< emacs-major-version 28) (require 'subr-x))
     (condition-case-unless-debug err
-        (if-let ((buffer (pop-to-buffer-same-window "*elpaca-bootstrap*"))
-                 ((zerop (apply #'call-process `("git" nil ,buffer t "clone"
-                                                 ,@(when-let ((depth (plist-get order :depth)))
-                                                     (list (format "--depth=%d" depth) "--no-single-branch"))
-                                                 ,(plist-get order :repo) ,repo))))
-                 ((zerop (call-process "git" nil buffer t "checkout"
-                                       (or (plist-get order :ref) "--"))))
-                 (emacs (concat invocation-directory invocation-name))
-                 ((zerop (call-process emacs nil buffer nil "-Q" "-L" "e" "--batch"
-                                       "--eval" "(byte-recompile-directory \"e\" 0 'force)")))
-                 ((require 'elpaca))
-                 ((elpaca-generate-autoloads "elpaca" repo)))
+        (if-let* ((buffer (pop-to-buffer-same-window "*elpaca-bootstrap*"))
+                  ((zerop (apply #'call-process `("git" nil ,buffer t "clone"
+                                                  ,@(when-let* ((depth (plist-get order :depth)))
+                                                      (list (format "--depth=%d" depth) "--no-single-branch"))
+                                                  ,(plist-get order :repo) ,repo))))
+                  ((zerop (call-process "git" nil buffer t "checkout"
+                                        (or (plist-get order :ref) "--"))))
+                  (emacs (concat invocation-directory invocation-name))
+                  ((zerop (call-process emacs nil buffer nil "-Q" "-L" "." "--batch"
+                                        "--eval" "(byte-recompile-directory \".\" 0 'force)")))
+                  ((require 'elpaca))
+                  ((elpaca-generate-autoloads "elpaca" repo)))
             (progn (message "%s" (buffer-string)) (kill-buffer buffer))
           (error "%s" (with-current-buffer buffer (buffer-string))))
       ((error) (warn "%s" err) (delete-directory repo 'recursive))))
@@ -100,9 +102,9 @@
 
 ;; Untried
 
-(when (>= emacs-major-version 30)
-  (elpaca (casual-avy :repo "https://github.com/kickingvegas/casual-avy"))
-  (elpaca (casual-dired :repo "https://github.com/kickingvegas/casual-dired")))
+;; (when (>= emacs-major-version 30)
+;;   (elpaca (casual-avy :repo "https://github.com/kickingvegas/casual-avy"))
+;;   (elpaca (casual-dired :repo "https://github.com/kickingvegas/casual-dired")))
 (elpaca dogears)
 ;; (elpaca tree-sitter)
 ;; (elpaca tree-sitter-langs)
@@ -201,7 +203,7 @@
   (dired-async-mode))
 
 (use-package asyncloop
-  :ensure (:fetcher github repo "meedstrom/asyncloop"))
+  :ensure (:fetcher github :repo "meedstrom/asyncloop"))
 
 ;; TODO Get Doom's autorevert behavior for dired too
 (use-package autorevert
@@ -1041,7 +1043,8 @@
 (use-package el-job
   :ensure ( :build (+elpaca/build-if-new)
             :repo "https://github.com/meedstrom/el-job"
-            :inherit nil))
+            :inherit nil)
+  :init (setq el-job--debug-level 2))
 
 (use-package org-node
   :ensure ( :build (+elpaca/build-if-new))
@@ -1082,13 +1085,22 @@
            (or (string-search "archive/" (org-node-get-file-path node))
                (string-search "noagenda/" (org-node-get-file-path node))))))
 
-  (setq org-node-series-defs
+  (setq org-node-seq-defs
         (list
-         ;;(org-node-mk-series-on-tags-sorted-by-property
-         ;; "w" "My public notes (visible on the web)" "pub" "CREATED")
-         (org-node-mk-series-on-filepath-sorted-by-basename
-          "d" "Dailies" "~/org/daily/" nil t)
-         ))
+         ;; The series of all nodes that have tag :pub:, sorted by the
+         ;; datestamp that I've put in their :CREATED: property.
+         (org-node-seq-def-on-tags-sort-by-property
+          "w" "My public notes (visible on the web)" "pub" "CREATED")
+         ;; All notes in creation order!  Once again via :CREATED: property.
+         (org-node-seq-def-on-any-sort-by-property
+          "a" "All notes" "CREATED")
+         ;; My dailies/journal/diary, what you want to call it.  Currently I
+         ;; still have them like org-roam-dailies expects: confined to a
+         ;; subdirectory, with filenames such as "2024-11-18.org".
+         (org-node-seq-def-on-filepath-sort-by-basename
+          "d" "Dailies" "~/org/daily/" nil t)))
+
+
 
   ;; (setq org-node-series-defs
   ;;       (list
@@ -1137,10 +1149,10 @@
   :ensure (:build (+elpaca/build-if-new))
   :after org-node
   :config
-  (setq org-node-fakeroam-persist-previews t)
+  (setq org-node-fakeroam-fast-render-persist t)
   (add-hook 'org-roam-mode-hook #'visual-line-mode)
   (org-node-fakeroam-jit-backlinks-mode)
-  (org-node-fakeroam-db-feed-mode)
+  ;; (org-node-fakeroam-db-feed-mode)
   (org-node-fakeroam-redisplay-mode)
   (org-node-fakeroam-fast-render-mode)
   (add-hook 'org-open-at-point-functions
@@ -1507,6 +1519,8 @@
 (setq vc-follow-symlinks t)
 (setq auth-sources '("~/.authinfo")) ;; https://magit.vc/manual/ghub/Storing-a-Token.html
 (setq shr-max-image-proportion 0.5)
+(setq initial-scratch-message nil)
+(setq initial-buffer-choice #'recentf-open-files)
 (setq mouse-yank-at-point t)
 (setq recentf-max-saved-items 1000)
 (setq save-interprogram-paste-before-kill t)
@@ -2332,9 +2346,6 @@
   :hook ((python-mode . pyvenv-auto-run)))
 (use-package anaconda-mode)
 (add-to-list 'major-mode-remap-alist '(python-mode . python-ts-mode))
-
-
-(setq initial-buffer-choice #'recentf-open-files)
 
 ;; (elpaca (nano :fetcher github :repo "rougier/nano-emacs")
 
