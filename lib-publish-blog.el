@@ -45,7 +45,6 @@ code, but not the notes).
 With C-u C-u, also run `my-validate-org-buffer' on each file
 scanned."
   (interactive)
-
   (view-echo-area-messages) ;; for watching it work
   (setq org-export-use-babel nil)
   (setq org-export-with-broken-links nil) ;; links would disappear quietly!
@@ -54,7 +53,7 @@ scanned."
   (setq org-html-html5-fancy t)
   (setq org-html-with-latex 'html) ;; Use `org-latex-to-html-convert-command'
   ;; TODO: upstream as an option for `org-html-with-latex'. this is very fast
-  (setq org-latex-to-html-convert-command "node ~/.doom.d/texToMathML.js %i")
+  (setq org-latex-to-html-convert-command "node ~/.config/emacs/texToMathML.js %i")
   (setq save-silently t)
   (setq debug-on-error t)
   (setq-default tab-width 8)
@@ -110,7 +109,7 @@ scanned."
                                  minibuffer-regexp-mode
                                  my-auto-commit-mode
                                  nerd-icons-completion-mode
-                                 org-node-backlink-global-mode
+                                 org-node-backlink-mode
                                  org-node-cache-mode
                                  org-node-complete-at-point-mode
                                  org-node-fakeroam-db-feed-mode
@@ -181,22 +180,26 @@ scanned."
       (me/load-theme theme)))
 
   ;; Copy the files to /tmp to work from there
-  (mkdir "/tmp/roam" t)
-  (shell-command "rm -rfv /tmp/roam/org/")
-  (shell-command "cp -a /home/kept/roam /tmp/roam/org")
+  (mkdir "/tmp/posts" t)
+  (mkdir "/tmp/posts/org" t)
+  (shell-command "rm -rfv /tmp/posts/org/*")
+  (shell-command "cp -a ~/org/* /tmp/posts/org/")
+  ;; HACK: Subfolders currently get their own img folders (not intentional),
+  ;;       merge.
+  (shell-command "mv -t /tmp/posts/org/img/ /tmp/posts/org/*/img/*")
 
   ;; Pretty-print a post of recent completed todos
-  (let ((org-agenda-files '("/tmp/roam/org/noagenda/archive.org")))
-    (my-generate-todo-log "/tmp/roam/org/todo-log.org"))
+  (let ((org-agenda-files '("/tmp/posts/org/noagenda/archive.org")))
+    (my-generate-todo-log "/tmp/posts/org/todo-log.org" "/tmp/posts/"))
 
   ;; Ensure that each post URL will contain a unique page ID by now placing
   ;; them in subdirectories named by that ID, since org-export will translate
   ;; all org-id links into these relative filesystem paths.
-  (cl-loop for path in (directory-files-recursively "/tmp/roam/org/" "\\.org$")
-           do (if (and (not (string-search ".sync-conflict-" path))
-                       (not (string-search "/logseq/" path)))
+  (cl-loop for path in (directory-files-recursively "/tmp/posts/org/" "\\.org$")
+           do (if (not (or (string-search ".sync-conflict-" path)
+                           (string-search "/logseq/" path)))
                   (if-let* ((uuid (my-org-file-id path))
-                            (newdir (concat "/tmp/roam/org/"
+                            (newdir (concat "/tmp/posts/org/"
                                             (my-uuid-to-short uuid)
                                             "/")))
                       (progn
@@ -207,17 +210,17 @@ scanned."
                 (delete-file path)))
 
   ;; Tell `org-id-locations' and the org-roam DB about the new work directory
-  (setq org-id-locations-file "/tmp/roam/org-id-locations")
-  (setq org-roam-db-location "/tmp/roam/org-roam.db")
-  (setq org-roam-directory "/tmp/roam/org/")
-  (setq org-node-extra-id-dirs '("/tmp/roam/org/"))
-  (setq org-agenda-files '("/tmp/roam/org/"))
+  (setq org-id-locations-file "/tmp/posts/org-id-locations")
+  (setq org-roam-db-location "/tmp/posts/org-roam.db")
+  (setq org-roam-directory "/tmp/posts/org/")
+  (setq org-node-extra-id-dirs '("/tmp/posts/org/"))
+  (setq org-agenda-files '("/tmp/posts/org/"))
 
   ;; With C-u, wipe databases so they get rebuilt
   (when current-prefix-arg
-    (shell-command "rm /tmp/roam/org-roam.db")
+    (shell-command "rm /tmp/posts/org-roam.db")
     (me/wipe-org-id)
-    ;; With C-u C-u, lint too
+    ;; With C-u C-u, run my custom linter too
     (if (equal current-prefix-arg '(16))
         (add-hook 'my-org-roam-pre-scan-hook #'lintorg-lint)
       (remove-hook 'my-org-roam-pre-scan-hook #'lintorg-lint)))
@@ -231,8 +234,8 @@ scanned."
     )
 
   ;; Wipe previous work output
-  (shell-command "rm -rf /tmp/roam/{html,json,atom}/")
-  (shell-command "mkdir -p /tmp/roam/{html,json,atom}")
+  (shell-command "rm -rf /tmp/posts/{html,json,atom}/")
+  (shell-command "mkdir -p /tmp/posts/{html,json,atom}")
   (clrhash my-ids)
 
   ;; Change some things about the Org files, before org-export does its thing.
@@ -241,22 +244,23 @@ scanned."
   (add-hook 'org-export-before-parsing-functions #'my-strip-inline-anki-ids)
   (add-hook 'org-export-before-parsing-functions #'org-transclusion-mode 1)
   (add-hook 'org-export-before-parsing-functions
-            ;; Let hooks manipulate the transcluded areas (usually read-only)
+            ;; Allow later hooks to manipulate the org-transclusion areas
+            ;; (which are usually read-only)
             (lambda (&rest _) (setq buffer-read-only nil)) 2)
   (add-hook 'org-export-before-parsing-functions #'my-add-backlinks 10)
   (add-hook 'org-export-before-parsing-functions #'my-ensure-section-containers 20)
 
-  (org-publish "my-slipbox-blog" t) ;; Main. Runs the rest of this file.
+  (org-publish "my-slipbox-blog" t) ;; "Main"; basically run the rest of this file.
   (my-check-id-collisions)
-  (my-compile-atom-feed "/tmp/roam/posts.atom" "/tmp/roam/atom/")
+  (my-compile-atom-feed "/tmp/posts/posts.atom" "/tmp/posts/atom/")
   (find-file "/home/kept/pub/")
   (async-shell-command "./encrypt-rebuild.sh")
   (start-process "firefox" nil "firefox" "http://localhost:5173"))
 
 (setopt org-publish-project-alist
         `(("my-slipbox-blog"
-           :base-directory "/tmp/roam/org/"
-           :publishing-directory "/tmp/roam/html/"
+           :base-directory "/tmp/posts/org/"
+           :publishing-directory "/tmp/posts/html/"
            :publishing-function my-publish-to-blog
            :recursive t
            :body-only t
@@ -290,7 +294,7 @@ through to `org-html-publish-to-html'."
       (cl-assert (memq (buffer-local-value 'buffer-undo-list open) '(t nil)))
       (kill-buffer open))
     (when (= 0 (% (cl-incf my-publish-ctr) 200))
-      ;; Reap open file handles (max 1024 on many distros, and in Emacs)
+      ;; Reap open file handles (max 1024 on many OSes and in Emacs)
       (garbage-collect))
     (with-current-buffer (find-file-noselect filename)
       (goto-char (point-min))
@@ -315,7 +319,7 @@ through to `org-html-publish-to-html'."
                     :tags tags
                     :hidden hidden
                     :created created
-                    :createdFancy created-fancy ;; JS camelCase
+                    :createdFancy created-fancy
                     :updated updated
                     :updatedFancy updated-fancy
                     :slug (string-replace pub-dir "" html-path)
@@ -347,19 +351,20 @@ through to `org-html-publish-to-html'."
                                            html-path metadata))))
              (uuid (org-id-get)))
         (let ((save-silently t))
-          ;; Write JSON object
-          (with-temp-file (concat "/tmp/roam/json/" pageid)
+          ;; Write JSON object to be read by my Svelte app
+          (with-temp-file (concat "/tmp/posts/json/" pageid)
             (insert (json-encode post)))
-          ;; Write Atom entry if it's an okay post for the feed
+          ;; Write Atom entry if the post is acceptable for the feed
           (when (and (not hidden)
                      (not (-intersection tags '("tag" "daily" "stub" "unwashed")))
                      (string-lessp "2023" (or updated created)))
-            (with-temp-file (concat "/tmp/roam/atom/" pageid)
+            (with-temp-file (concat "/tmp/posts/atom/" pageid)
               (insert (my-make-atom-entry post uuid))))))
       (kill-buffer (current-buffer)))))
 
 (defun my-customize-the-html (html-path metadata)
-  "Take contents of HTML-PATH and return customized content."
+  "Take contents of HTML-PATH and return customized content.
+METADATA is most of the corresponding post's metadata."
   (let ((dom (with-temp-buffer
                (insert-file-contents html-path)
                ;; Give the ToC div a class and remove its pointless inner div
@@ -381,7 +386,9 @@ through to `org-html-publish-to-html'."
         ""
 
       ;; Declutter unused classes
-      (cl-loop for node in (--mapcat (dom-by-class dom it) '("org-ul" "org-ol"))
+      ;; (Actually remove the entire class="..." attribute, but that's OK here)
+      (cl-loop for node in (--mapcat (dom-by-class dom it)
+                                     '("org-ul" "org-ol"))
                do (dom-remove-attribute node 'class))
 
       ;; Edit the .outline-2, .outline-3... divs that Org generated to enable
@@ -404,23 +411,21 @@ through to `org-html-publish-to-html'."
        when (and uuid? (org-uuidgen-p uuid?))
        do (let ((shortid (my-uuid-to-short uuid?))
                 (target-tags (-flatten (org-roam-db-query
-                                        `[:select [tag]
-                                                  :from tags
-                                                  :where (= node-id ,uuid?)]))))
+                                        `[ :select [tag]
+                                           :from tags
+                                           :where (= node-id ,uuid?)]))))
             ;; 2024-07-25 I'm no longer adding :noexport: everywhere.  My
             ;; system was made for opt-out publishing, so hack it to be opt-in
-            ;; via explicitly including "pub".
-            (when (or (not (-intersection target-tags
-                                          (append my-tags-for-publishing
-                                                  my-tags-to-avoid-uploading)))
+            ;; by adding "noexport" if :pub: or its siblings are not present.
+            (when (or (not (-intersection target-tags my-tags-for-publishing))
                       (null target-tags))
               (push "noexport" target-tags))
-
-            ;; Replace all UUID with my shortened form, and strip the
-            ;; #HEADING-ID if it matches /PAGE-ID.
+            ;; Replace the UUIDs with my shortened ID form,
+            ;; and strip the #HEADING-ID if it is the same as /PAGE-ID/
+            ;; (typical for links that don't go to a specific subheading).
             (dom-set-attribute anchor 'href (my-strip-hash-if-matches-base
                                              (string-replace hash shortid href)))
-            ;; Style the link based on tags of target document
+            ;; Let the link be styled based on target document's tags
             (when target-tags
               (dom-set-attribute anchor 'class (string-join target-tags " ")))
             ;; https://www.w3.org/TR/dpub-aria-1.0/#doc-backlink
@@ -429,7 +434,7 @@ through to `org-html-publish-to-html'."
             ;; Remember the short-ID for a collision-check later on
             (push uuid? (gethash shortid my-ids))))
 
-      ;; Format nondescript links more nicely
+      ;; Format nondescript links (bare URLs) more nicely
       (cl-loop
        for anchor in (dom-by-tag dom 'a)
        as children = (dom-children anchor)
@@ -444,7 +449,7 @@ through to `org-html-publish-to-html'."
             (dom-add-child-before anchor fixed-desc desc)
             (dom-remove-node anchor desc)))
 
-      ;; Fix IDs for sections and add self-links next to their headings
+      ;; Fix <section id="..."> attributes, and add self-links to the section
       (let-alist (kvplist->alist metadata)
         (cl-loop
          for section in (dom-by-tag dom 'section)
@@ -471,26 +476,29 @@ through to `org-html-publish-to-html'."
               ;; "outline-container-org1234567"
               (dom-set-attribute section 'id id))))
 
-      ;; Org-export doesn't replace double/triple-dash in all situations (like
-      ;; in a heading or when it butts up against a link on a newline), so
-      ;; force it
-      (cl-labels ((fix-non-code-nodes (dom)
+      ;; Org-Export doesn't replace double/triple-dash in all situations (like
+      ;; inside a heading, or when the triple-dash butts up against a link on a
+      ;; newline), so force it.
+      (cl-labels ((fix-recursively-unless-verbatim (dom)
                     (cl-loop
                      for child in (dom-children dom)
                      if (stringp child)
+                     ;; Leaf-node that is a bare string, e.g. the string
+                     ;; "Boca" within a node <p>Boca</p>.  Edit it.
                      do (let ((fixed-child (->> child
                                                 (string-replace "---" "—")
                                                 (string-replace "--" "–"))))
                           (unless (equal fixed-child child)
                             (dom-add-child-before dom fixed-child child)
                             (dom-remove-node dom child)))
+                     ;; Not a bare string, go deeper.  But skip <code> blocks.
                      else if (not (member (dom-tag child) '(code pre kbd samp)))
                      do (progn
-                          ;; Bonus: strip unnecessary ID attributes
                           (unless (eq (dom-tag child) 'section)
+                            ;; Bonus: strip unnecessary ID attributes
                             (dom-remove-attribute child 'id))
-                          (fix-non-code-nodes child)))))
-        (fix-non-code-nodes dom))
+                          (fix-recursively-unless-verbatim child)))))
+        (fix-recursively-unless-verbatim dom))
 
       ;; Wrap tables in divs that can be scrolled left-right
       (cl-loop for tbl in (dom-by-tag dom 'table)
@@ -504,23 +512,28 @@ through to `org-html-publish-to-html'."
 
       ;; Fix img attributes
       (cl-loop for img in (dom-by-tag dom 'img)
-               as path = (dom-attr img 'src)
+               as src = (dom-attr img 'src)
                as alt = (dom-attr img 'alt)
-               when (string-prefix-p "img" path)
-               ;; Fix paths
-               do (dom-set-attribute img 'src (concat "/" path))
-               ;; Org exports an image alt-text that is just the image
-               ;; basename.  Interesting idea, since the alt-text becomes
-               ;; portable if that's where you put the alt-text!  Go with it
-               ;; and just strip .jpg/.png extension.
-               and when (string-search alt path)
+               ;; All my Org files have image links that start with
+               ;; "file:img/..." because the directory "img/" sits in the same folder
+               ;; as the Org files, but my blog has more nested paths for each
+               ;; note while the img path is absolute.  So prepend a slash.
+               when (string-prefix-p "img" src)
+               do (dom-set-attribute img 'src (concat "/" src))
+               ;; Absent an #+ATTR_HTML: :alt attribute, Org exports an image
+               ;; alt-text copied from the file basename.  Interesting idea,
+               ;; since the alt-text becomes portable if that's where you put
+               ;; the alt-text!  Go with it and just strip .jpg/.png extension.
+               and when (string-search alt src)
                do (dom-set-attribute img 'alt (->> alt
                                                    (file-name-sans-extension)
                                                    (string-replace "_" " "))))
 
-      ;; Let images that aren't links become self-links.  Such links, that
-      ;; point to resources on the same domain, also need rel="external" in
-      ;; order to prevent SvelteKit from interpreting the URL as a SPA route.
+      ;; Let images that aren't already linkified become self-links.
+      ;; Such links, to resources on the same domain, also need rel="external"
+      ;; to prevent SvelteKit from handling the URL as a SPA route.
+      ;; NOTE: Do not merge with the other loop on image elements, b/c this one
+      ;;       will insert new elements.
       (cl-loop for img in (dom-by-tag dom 'img)
                as parent = (dom-parent dom img)
                unless (eq 'a (dom-tag parent))
@@ -531,7 +544,18 @@ through to `org-html-publish-to-html'."
                     (dom-add-child-before parent linkified-img img)
                     (dom-remove-node parent img)))
 
+      ;; Much the same as above <img> changes, but for any regular <a>
+      ;; element pointing to an image (i.e. there is an image resource that a
+      ;; note simply links to, instead of embedding).
+      (cl-loop for anchor in (dom-by-tag dom 'a)
+               as href = (dom-attr anchor 'href)
+               when (string-prefix-p "img" href)
+               do
+               (dom-set-attribute anchor 'href (concat "/" href))
+               (dom-set-attribute anchor 'rel "external"))
+
       ;; Return final HTML.  Phew!
+      ;; Note `dom-print' had a bug -- patched in self-contained/patches.el.
       (with-temp-buffer
         (dom-print dom)
         (search-backward "</body></html>")
@@ -552,8 +576,9 @@ through to `org-html-publish-to-html'."
   "Version of `org-roam-db-update-file' calling `my-org-roam-pre-scan-hook'."
   (setq file-path (or file-path (buffer-file-name (buffer-base-buffer))))
   (let ((content-hash (org-roam-db--file-hash file-path))
-        (db-hash (caar (org-roam-db-query [:select hash :from files
-                                                   :where (= file $s1)] file-path)))
+        (db-hash (caar (org-roam-db-query [ :select hash :from files
+                                            :where (= file $s1)]
+                                          file-path)))
         info)
     (unless (string= content-hash db-hash)
       (require 'org-ref nil 'noerror)
@@ -762,3 +787,5 @@ publishing FILENAME."
                          org-publish-project-alist)
                         project))))
           (funcall find-parent-project project)))))))
+
+;;; lib-publish-blog.el ends here

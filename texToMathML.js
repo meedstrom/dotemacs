@@ -14,6 +14,7 @@ if (input.slice(0, 2) === "\\[" || input.slice(0, 2) === "$$") {
   console.error("Did you quote the input correctly?");
   process.exit(1);
 }
+
 console.log(
   katex.renderToString(input, {
     displayMode: disp,
@@ -21,7 +22,7 @@ console.log(
     trust: true,
     // I'd love to see errors, but the org exporter doesn't show you the thrown
     // error anyway, it just inserts the error string into the document.
-    // Better to return the original latex.
+    // Better in that case to return the original LaTeX.
     throwOnError: false,
     strict: false,
   }),

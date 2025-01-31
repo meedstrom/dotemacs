@@ -3,5 +3,6 @@
 *#
 *.bak
 elpaca/
+elpa/
 node_modules/
 /subed/

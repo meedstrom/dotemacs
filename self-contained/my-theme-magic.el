@@ -20,7 +20,7 @@
 ;; Features:
 
 ;; 1. On init, select a random theme from a user-configured list.  Actually,
-;;    different lists for day and night.
+;;    use different lists for day and night.
 
 ;; 2. Better load-theme command, that first unloads previous themes, and runs
 ;;    a hook so you can trigger e.g. powerline-reset, prism-set-colors
@@ -40,6 +40,9 @@
 ;; - for prism-mode, none of the faces should be much darker than the rest
 
 ;;; User config:
+
+;; Enable at init
+(add-hook 'after-init-hook 'me/load-random-theme-and-reschedule)
 
 (defvar me/load-theme-hook '(me/prism-desaturate-maybe
                              ;; prism-set-colors
@@ -141,32 +144,60 @@ selections are taken from `me/okay-themes-day' in the day and
     (me/load-random-theme-and-reschedule)))
 
 (defvar me/theme-timer (timer-create))
+(defvar me/theme-force-day nil)
+(defvar me/theme-force-night nil)
+
+(defun me/load-dark-theme ()
+  (interactive)
+  (setq me/theme-force-night t)
+  (me/load-random-theme))
+
+(defun me/load-light-theme ()
+  (interactive)
+  (setq me/theme-force-day t)
+  (me/load-random-theme))
 
 (defun me/load-random-theme-and-reschedule ()
-  (me/load-random-theme)    
+  (me/load-random-theme)
   (cancel-timer me/theme-timer)    
   (setq me/theme-timer
         (run-with-timer 3600 nil #'me/load-random-theme-and-reschedule)))
 
 (defun me/load-random-theme ()
   (interactive)
-  (let ((hour (decoded-time-hour (decode-time)))
-        (shift (me/winter-shift (decoded-time-month (decode-time)))))
-    (if (< (+ 7 shift) hour (- 17 shift))
-        (me/load-theme (seq-random-elt me/okay-themes-day))
-      (me/load-theme (seq-random-elt me/okay-themes-night)))))
+  (let* ((hour (decoded-time-hour (decode-time)))
+         (shift (/ (me/winter-shift (decoded-time-month (decode-time)))
+                   2.0))
+         ;; In June/July, treat day as 6:30 to 17:30.
+         ;; In Dec/Jan, treat day as 9:00 to 15:00.
+         ;; (not ideal due to DST, can the EU please get rid of it soon?)
+         (is-day (< (+ 6 shift) hour (- 18 shift))))
+    (if me/theme-force-day
+        (if is-day
+            (setq me/theme-force-day nil)
+          (setq is-day t)))
+    (if me/theme-force-night
+        (if is-day
+            (setq is-day nil)
+          (setq me/theme-force-night nil)))
+    (let ((theme (if is-day
+                     (seq-random-elt me/okay-themes-day)
+                   (seq-random-elt me/okay-themes-night))))
+      (me/load-theme theme)
+      (message "%S" theme))))
 
-;; Screw dealing with location providers
+;; Screw dealing with location providers.  Computer already has the timezone,
+;; add a hint of personal preference via hardcoded numbers above (even with a
+;; location provider, you could still have preferences, and once you have done
+;; that, you don't need the location provider).
 (defun me/winter-shift (x)
   "Rate how close month X is to midwinter.
-X is the numeric month 1-12, and the result is a number between 0 and 3.
-This can be used to adjust hours on account of daylight."
-  (/ (if (> x 6)
-         (- x 6)
-       (- 6 x))
-     2))
+X is the numeric month 1-12, and the result is a number between 1 and 6,
+where 6 means midwinter.
+This can be used to adjust stuff on account of daylight hours.
 
-;;; Finally
-
-;; Enable at init
-(add-hook 'elpaca-after-init-hook #'me/load-random-theme-and-reschedule)
+From January to December, the outputs would be:
+6 5 4 3 2 1 1 2 3 4 5 6"
+  (if (> x 6)
+      (- x 6)
+    (- 7 x)))

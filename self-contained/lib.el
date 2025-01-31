@@ -21,7 +21,18 @@
   (require 'map)
   (require 'subr-x)
   (require 'dash)
+  (require 'llama)
   (require 'crux))
+
+(defun me/set-font-size ()
+  (interactive)
+  (let ((new (read-number "Height: " (face-attribute 'default :height))))
+    (set-face-attribute 'default () :height new)))
+
+(defun me/toggle-org-hide-emphasis-markers ()
+  (interactive)
+  (setq org-hide-emphasis-markers (not org-hide-emphasis-markers))
+  (font-lock-update))
 
 ;; See excellent research at https://github.com/org-roam/org-roam/pull/1460.
 ;; TL:DR: don't strip ALL nonspacing marks, not even the 0300-036F range.
@@ -80,7 +91,7 @@ See `me/write-eldata' for reason to kill the buffer.
 Also use the unadvised `delete-file', since it can be bogged
 down by slow advices."
   (cl-assert (file-name-absolute-p file))
-  (let ((real-delete (org-node--fn-sans-advice #'delete-file))
+  (let ((real-delete (me/fn-sans-advice #'delete-file))
         (buf (if (>= emacs-major-version 30)
                  (get-truename-buffer file)
                (get-file-buffer file))))
@@ -102,7 +113,7 @@ down by slow advices."
            when (eq (cdr (assq 'provide elems)) feature)
            return file))
 
-;; Upstreamable IMO
+;; Upstream?
 (defun me/hexa-to-decimal (hexadecimal-string &optional interactive)
   (interactive "s\np")
   (if interactive
@@ -155,7 +166,7 @@ down by slow advices."
 
 (defun me/goto-today ()
   (interactive)
-  (org-node-series-goto "d" (format-time-string "%F"))
+  (org-node-seq-goto "d" (format-time-string "%F"))
   (goto-char (point-max))
   (unless (= (point) (pos-bol))
     (newline))
@@ -432,18 +443,10 @@ present, pass the pattern to the next dispatcher, in case that is
   (require 'consult)
   (if (boundp 'doom-version)
       (+default/search-cwd)
-    (let ((region-or-thing
-           (if (use-region-p)
-               (buffer-substring-no-properties (region-beginning) (region-end))
-             ;; See Doom sources
-             (if (memq (xref-find-backend) '(eglot elpy nox))
-                 (xref-backend-identifier-at-point (xref-find-backend))
-               (thing-at-point 'symbol t)))))
-      (consult--grep "rg: "
-                     #'consult--ripgrep-make-builder
-                     default-directory
-                     (when region-or-thing
-                       (regexp-quote region-or-thing))))))
+    (consult--grep "rg: "
+                   #'consult--ripgrep-make-builder
+                   default-directory
+                   nil)))
 
 (defun my-commands-starting-with (prefix)
   (let (commands)
@@ -1203,10 +1206,10 @@ arg. In addition, use fish if available."
 ;; bloggable
 (defun my-fill-unfill-respect-double-space ()
   "Toggle filling/unfilling of the current region, or current
-    paragraph if no region is active.  Also pretend that
-    `sentence-end-double-space' is non-nil to avoid clobbering
-    existing double spaces. See `fill-paragraph' for what a prefix
-    command will do."
+paragraph if no region is active.  Also pretend that
+`sentence-end-double-space' is non-nil to avoid clobbering
+existing double spaces. See `fill-paragraph' for what a prefix
+command will do."
   (interactive)
   (let ((deactivate-mark nil)
         (fill-column (if (eq last-command this-command)
@@ -1216,7 +1219,7 @@ arg. In addition, use fish if available."
         (sentence-end-double-space t))
     ;; For whatever reason, `fill-paragraph-function' does not get consulted in
     ;; org buffers, so we have to do this manually, even though we don't have
-    ;; to call `lisp-fill-paragraph' explicitly in lisp buffers.
+    ;; to call e.g. `lisp-fill-paragraph' in lisp buffers.
     (if (derived-mode-p 'org-mode)
         (call-interactively #'org-fill-paragraph)
       (call-interactively #'fill-paragraph))))
@@ -1425,7 +1428,7 @@ until the program finishes."
   (start-process "duc" nil "duc" "index" "/home"))
 
 (defun my-index-locatedb ()
-  (when (string-match-p "GNU" (my-process-output-to-string "updatedb" "--version"))
+  (when (string-search "GNU" (my-process-output-to-string "updatedb" "--version"))
     (unless (getenv "FINDOPTIONS")
       (setenv "FINDOPTIONS" (concat " -name node_modules -prune "
                                     " -name packrat -prune "
@@ -1440,42 +1443,33 @@ until the program finishes."
 (defun my-prev-file-in-dir ()
   (interactive)
   (let* ((files (directory-files default-directory t))
-         (remainder (reverse (seq-difference files
-                                             (member (buffer-file-name) files))))
+         (remainder (reverse
+                     (seq-difference files
+                                     (member (buffer-file-name) files))))
+         (regexp (rx (or "." ".elc" ".pdf" ".o" ".pyc" ".so" (seq ".so." num))
+                     eol))
          (first-relevant-file
           (cl-loop for x in remainder
                    until (not (or (file-directory-p x)
-                                  (string-match-p
-                                   (rx "." (or "elc" "pdf" "o" "pyc" "so" (seq "so." num)) eol)
-                                   x)))
+                                  (string-match-p regexp x)))
                    finally return x)))
     (if first-relevant-file
         (find-file first-relevant-file)
       (message "No more files in directory"))))
 
-;; bloggable
-(defun my-next-file-in-dir (&optional literally)
-  (interactive "p")
-  (let* ((remainder (cdr (member (buffer-file-name)
-                                 (directory-files default-directory t))))
+(defun my-next-file-in-dir ()
+  (interactive)
+  (let* ((files (directory-files default-directory t))
+         (remainder (cdr (member (buffer-file-name) files)))
+         (regexp (rx (or "." ".elc" ".pdf" ".o" ".pyc" ".so" (seq ".so." num))
+                     eol))
          (first-relevant-file
           (cl-loop for x in remainder
-                   until (not (or (null x)
-                                  (string-match-p
-                                   (rx (or "."
-                                           ".elc"
-                                           ".pdf"
-                                           ".o"
-                                           ".pyc"
-                                           ".so"
-                                           (seq ".so." num))
-                                       eol) x)
+                   until (not (or (string-match-p regexp x)
                                   (file-directory-p x)))
                    finally return x)))
     (if first-relevant-file
-        (if (= 4 literally)
-            (find-file-literally first-relevant-file)
-          (find-file first-relevant-file))
+        (find-file first-relevant-file)
       (message "No more files in directory"))))
 
 ;; bloggable
@@ -2893,25 +2887,24 @@ matches PAGE-ID anyway (i.e. it's a file-level id)"
         base
       link)))
 
-(defun my-generate-todo-log (path)
+(defun my-generate-todo-log (path tmpdir)
   "Generate a new Org file showcasing recent completed TODOs."
   (let ((org-agenda-span 'fortnight)
         (org-agenda-prefix-format
          '((agenda . " %i %?-12t") (todo . "") (tags . "") (search . "")))
-        (org-agenda-show-inherited-tags nil))
+        (org-agenda-show-inherited-tags nil)
+        (default-directory tmpdir))
     (org-agenda-list)
     (org-agenda-log-mode)
     (org-agenda-archives-mode)
-    (shell-command "rm /tmp/roam/todo-log-now.html")
-    (org-agenda-write "/tmp/roam/todo-log-now.html")
+    (shell-command "rm todo-log-now.html")
+    (org-agenda-write (expand-file-name "todo-log-now.html"))
     (org-agenda-earlier 1)
-    (shell-command "rm /tmp/roam/todo-log-last-week.html")
-    (org-agenda-write "/tmp/roam/todo-log-last-week.html")
-    (org-agenda-quit)
+    (shell-command "rm todo-log-last-week.html")
+    (org-agenda-write (expand-file-name "todo-log-last-week.html"))
+    (org-agenda-quit)    
     (find-file path)
-    ;; with-current-buffer (or (find-buffer-visiting path)
-    ;;                         )
-    (delete-region (point-min) (point-max))
+    (erase-buffer)
     (insert ":PROPERTIES:"
             "\n:ID: e4c5ea8b-5b06-43c4-8948-3bfe84e8d5e8"
             "\n:CREATED:  " (format-time-string "[%F]")
@@ -2921,14 +2914,14 @@ matches PAGE-ID anyway (i.e. it's a file-level id)"
             "\n#+date: "
             "\n#+begin_export html"
             "\n")
-    (insert-file-contents "/tmp/roam/todo-log-last-week.html")
+    (insert-file-contents (concat tmpdir "todo-log-last-week.html"))
     (delete-region (point) (search-forward "<pre>"))
     (insert "<pre class=\"agenda\">")
     (forward-line)
     (delete-region (1- (line-beginning-position)) (line-end-position))
     (search-forward "</pre>")
     (delete-region (1- (line-beginning-position)) (point-max))
-    (insert-file-contents "/tmp/roam/todo-log-now.html")
+    (insert-file-contents (concat tmpdir "todo-log-now.html"))
     (delete-region (point) (search-forward "<pre>"))
     (forward-line)
     (delete-region (1- (line-beginning-position)) (line-end-position))
@@ -2960,14 +2953,15 @@ matches PAGE-ID anyway (i.e. it's a file-level id)"
     (insert "
 </feed>")))
 
-(defun my-make-atom-entry (post uuid)
-  (let-alist (kvplist->alist post)
+(defun my-make-atom-entry (post-metadata uuid)
+  (let-alist (kvplist->alist post-metadata)
     (let ((content-for-feed
            (with-temp-buffer
              (buffer-disable-undo)
              (insert .content)
              (goto-char (point-min))
-             ;; De-linkify links to non-public URLs
+             ;; De-linkify links to non-public URLs.  (They can't be accessed
+             ;; anyway, but broken links make bad reading experience.)
              (let* ((forbidden (regexp-opt (append my-tags-to-avoid-uploading
                                                    my-tags-for-hiding)))
                     (re (rx "<a " (*? nonl) "class=\"" (*? nonl)
@@ -2982,14 +2976,14 @@ matches PAGE-ID anyway (i.e. it's a file-level id)"
        "\n<link href=\"" "https://edstrom.dev/" .pageid "/" .slug "\" />"
        "\n<id>urn:uuid:" uuid "</id>"
        "\n<published>" .created "T12:00:00Z</published>"
-       (if .updated
-           (concat "\n<updated>" .updated "T12:00:00Z</updated>")
-         "")
-       ;; With type="xhtml", we don't have to entity-escape unicode
-       ;; (https://validator.w3.org/feed/docs/atom.html#text)
+       (when .updated
+         (concat "\n<updated>" .updated "T12:00:00Z</updated>"))
+       ;; With type="xhtml", we don't have to entity-escape the HTML.
+       ;; https://validator.w3.org/feed/docs/atom.html#text
+       ;; Could also use base64 to shrink the feed by 25%, but not inspectable.
        "\n<content type=\"xhtml\">"
-       "\n<div xmlns=\"http://www.w3.org/1999/xhtml\">\n"
-       content-for-feed
+       "\n<div xmlns=\"http://www.w3.org/1999/xhtml\">"
+       "\n" content-for-feed
        "\n</div>"
        "\n</content>"
        "\n</entry>"))))
